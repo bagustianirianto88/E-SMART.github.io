@@ -4,17 +4,17 @@ Web statis untuk GitHub Pages untuk scanning OMR LJK sekolah (SAS/STS).
 
 ## Fitur inti
 
-- Konfigurasi template interaktif (drag/resize box).
-- Zoom template (30%-150%) agar pengaturan sensor lebih mudah.
-- OMR berbentuk **lingkaran** untuk pembacaan no peserta dan jawaban.
-- No peserta mendukung arah opsi **vertikal** (ke bawah) atau horizontal.
-- Jawaban mendukung multi area (hingga 3 area), contoh:
-  - Area 1 soal 1-20
-  - Area 2 soal 21-40
-- Patokan grid otomatis ditampilkan sesuai jumlah soal dan jumlah opsi.
-- Sumber scan: upload batch, bridge feeder lokal HTTP, kamera fallback.
-- Backup/restore JSON untuk melanjutkan pengerjaan.
-- Export hasil ke Excel.
+- Sensor OMR **lingkaran per soal/per opsi** (bukan kotak besar tunggal).
+- Nomor peserta dibaca sebagai grid lingkaran (vertikal/horizontal).
+- Jawaban siswa dibaca sebagai grid lingkaran per area soal.
+- Multi area soal (hingga 3 area), misal area1 1-20 dan area2 21-40.
+- Template bisa di-zoom saat mengatur sensor.
+- Tersedia tab:
+  - Konfigurasi
+  - Hasil Scan
+  - Preview Sensor (lihat scan terakhir + overlay sensor)
+- Sumber scan: upload batch, feeder lokal HTTP bridge, kamera fallback.
+- Backup/restore JSON dan export Excel.
 
 ## Menjalankan lokal
 

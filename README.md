@@ -4,17 +4,18 @@ Web statis untuk GitHub Pages untuk scanning OMR LJK sekolah (SAS/STS).
 
 ## Fitur inti
 
-- Sensor OMR **lingkaran per soal/per opsi** (bukan kotak besar tunggal).
+- Sensor OMR **lingkaran per soal/per opsi** (bukan kotak besar tunggal) dengan grid abu-abu yang jelas terlihat.
 - Nomor peserta dibaca sebagai grid lingkaran (vertikal/horizontal).
 - Jawaban siswa dibaca sebagai grid lingkaran per area soal.
 - Multi area soal (hingga 3 area), misal area1 1-20 dan area2 21-40.
 - Template bisa di-zoom saat mengatur sensor.
-- Tersedia tab:
+- Tersedia tab (sudah aktif/fungsional):
   - Konfigurasi
   - Hasil Scan
   - Preview Sensor (lihat scan terakhir + overlay sensor)
 - Sumber scan: upload batch, feeder lokal HTTP bridge, kamera fallback.
 - Backup/restore JSON dan export Excel.
+- Threshold arsiran pensil dapat diatur untuk meningkatkan akurasi scan.
 
 ## Menjalankan lokal
 

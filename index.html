@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Evalbee LJK Scanner - GitHub Pages</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script async src="https://docs.opencv.org/4.10.0/opencv.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Evalbee LJK Scanner</h1>
+    <p>Scan LJK dari upload atau paper feeder (kamera), auto-orientasi, dan ekspor ke Excel.</p>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>1) Sumber Scan</h2>
+      <div class="row">
+        <label>Upload hasil scan LJK (gambar/PDF-scan sebagai gambar):
+          <input type="file" id="scanInput" accept="image/*" multiple />
+        </label>
+      </div>
+
+      <div class="row feeder">
+        <video id="video" autoplay playsinline></video>
+        <canvas id="frameCanvas" width="1280" height="720"></canvas>
+      </div>
+      <div class="row">
+        <button id="startCameraBtn">Start Paper Feeder (Kamera)</button>
+        <button id="captureBtn" disabled>Ambil Frame</button>
+        <button id="stopCameraBtn" disabled>Stop Kamera</button>
+      </div>
+      <small>Catatan: Browser tidak bisa membaca scanner hardware feeder langsung. Mode feeder menggunakan kamera untuk menangkap lembar secara beruntun.</small>
+    </section>
+
+    <section class="panel">
+      <h2>2) Template & Area Deteksi</h2>
+      <div class="row">
+        <label>Upload template LJK (disarankan ada kotak/sensor di 4 pojok):
+          <input type="file" id="templateInput" accept="image/*" />
+        </label>
+      </div>
+      <div class="row two-col">
+        <div>
+          <h3>Konfigurasi Sensor Orientasi</h3>
+          <label>Rasio tinggi area sensor atas (0-1):
+            <input type="number" id="topBand" min="0" max="1" step="0.01" value="0.12" />
+          </label>
+          <label>Rasio tinggi area sensor bawah (0-1):
+            <input type="number" id="bottomBand" min="0" max="1" step="0.01" value="0.12" />
+          </label>
+        </div>
+        <div>
+          <h3>Lokasi Nomor Peserta (Manual)</h3>
+          <label>X (0-1): <input type="number" id="noX" min="0" max="1" step="0.01" value="0.1" /></label>
+          <label>Y (0-1): <input type="number" id="noY" min="0" max="1" step="0.01" value="0.15" /></label>
+          <label>W (0-1): <input type="number" id="noW" min="0" max="1" step="0.01" value="0.25" /></label>
+          <label>H (0-1): <input type="number" id="noH" min="0" max="1" step="0.01" value="0.1" /></label>
+          <small>Area ini dipakai OCR ringan berbasis template angka hitam/putih (heuristik sederhana). Bisa disesuaikan untuk berbagai format LJK.</small>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>3) Database Peserta</h2>
+      <div class="row">
+        <textarea id="dbInput" rows="6" placeholder="Format: nomor_peserta,nama,kelas&#10;12345,Budi,9A&#10;12346,Siti,9B"></textarea>
+      </div>
+      <div class="row">
+        <button id="loadDbBtn">Muat Database</button>
+        <span id="dbStatus">Belum ada data.</span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>4) Proses & Hasil</h2>
+      <div class="row">
+        <button id="processBtn">Proses Semua LJK</button>
+        <button id="downloadBtn" disabled>Download Excel</button>
+      </div>
+      <pre id="log"></pre>
+      <table id="resultTable">
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Nomor Peserta</th>
+            <th>Nama</th>
+            <th>Kelas</th>
+            <th>Skor Bubbling</th>
+            <th>Orientasi</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+
+  <template id="rowTemplate">
+    <tr>
+      <td class="file"></td>
+      <td class="no"></td>
+      <td class="nama"></td>
+      <td class="kelas"></td>
+      <td class="score"></td>
+      <td class="orient"></td>
+    </tr>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>

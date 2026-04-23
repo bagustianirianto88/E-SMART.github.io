@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SAS/STS LJK Scanner - GitHub Pages</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script async src="https://docs.opencv.org/4.10.0/opencv.js"></script>
+</head>
+<body>
+  <header>
+    <h1>SAS/STS LJK Scanner (Evalbee)</h1>
+    <p>Siap untuk dokumentasi & penilaian kegiatan SAS/STS sekolah.</p>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>1) Upload Template + Konfigurasi Interaktif</h2>
+      <div class="row">
+        <label>Upload template LJK
+          <input type="file" id="templateInput" accept="image/*" />
+        </label>
+        <span class="hint">Geser kotak sensor langsung di template agar konfigurasi cepat dan akurat.</span>
+      </div>
+      <div class="workspace">
+        <canvas id="templateCanvas"></canvas>
+      </div>
+      <div class="grid2">
+        <div>
+          <h3>Sensor Orientasi (Atas 3 kotak, Bawah 2 kotak)</h3>
+          <p class="hint">Kotak biru: TOP1-TOP3. Kotak oranye: BOT1-BOT2.</p>
+        </div>
+        <div>
+          <h3>Area Penting</h3>
+          <p class="hint">Kotak hijau: nomor peserta. Kotak ungu: grid jawaban untuk auto nilai.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>2) Sumber Scan</h2>
+      <div class="row">
+        <label>Upload scan LJK (batch)
+          <input type="file" id="scanInput" accept="image/*" multiple />
+        </label>
+      </div>
+
+      <div class="row">
+        <h3>Paper feeder hardware (opsional)</h3>
+        <input id="feederUrl" value="http://localhost:17777/api/next-scan" />
+        <button id="pullFeederBtn">Ambil dari feeder lokal</button>
+        <span class="hint">Gunakan aplikasi bridge lokal scanner yang expose HTTP endpoint.</span>
+      </div>
+
+      <div class="row feeder">
+        <video id="video" autoplay playsinline></video>
+      </div>
+      <div class="row">
+        <button id="startCameraBtn">Start Kamera (fallback)</button>
+        <button id="captureBtn" disabled>Capture</button>
+        <button id="stopCameraBtn" disabled>Stop</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>3) Database Peserta + Kunci Jawaban</h2>
+      <div class="row">
+        <textarea id="dbInput" rows="6" placeholder="Format CSV: nomor_peserta,nama,kelas,ruang,mapel"></textarea>
+      </div>
+      <div class="row">
+        <label>Kunci jawaban (contoh: ABCDEABCDE...)
+          <input id="answerKey" type="text" placeholder="Masukkan kunci jawaban" />
+        </label>
+        <label>Jumlah soal
+          <input id="questionCount" type="number" min="1" max="200" value="40" />
+        </label>
+      </div>
+      <div class="row">
+        <button id="loadDbBtn">Muat Database</button>
+        <span id="dbStatus">Belum ada data.</span>
+      </div>
+      <table id="dbTable">
+        <thead>
+          <tr><th>Nomor</th><th>Nama</th><th>Kelas</th><th>Ruang</th><th>Mapel</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2>4) Proses, Nilai, dan Ekspor</h2>
+      <div class="row">
+        <button id="processBtn">Proses Semua</button>
+        <button id="downloadBtn" disabled>Download Excel</button>
+      </div>
+      <pre id="log"></pre>
+      <table id="resultTable">
+        <thead>
+          <tr>
+            <th>File</th><th>No Peserta</th><th>Nama</th><th>Kelas</th><th>Ruang</th><th>Mapel</th><th>Jawaban</th><th>Benar</th><th>Nilai</th><th>Orientasi</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

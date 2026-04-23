@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SAS/STS LJK Scanner - OMR Lingkaran</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script async src="https://docs.opencv.org/4.10.0/opencv.js"></script>
+</head>
+<body>
+  <header>
+    <h1>SAS/STS LJK Scanner (OMR Lingkaran)</h1>
+    <p>Sensor lingkaran per soal/opsi + tab hasil scan + preview sensor.</p>
+  </header>
+
+  <main>
+    <div class="tabs">
+      <button type="button" class="tab-btn active" data-tab="configTab">Konfigurasi</button>
+      <button type="button" class="tab-btn" data-tab="resultTab">Hasil Scan</button>
+      <button type="button" class="tab-btn" data-tab="previewTab">Preview Sensor</button>
+    </div>
+
+    <div id="configTab" class="tab-panel active">
+      <section class="panel">
+        <h2>1) Upload Template + Konfigurasi Interaktif</h2>
+        <div class="row">
+          <label>Upload template LJK <input type="file" id="templateInput" accept="image/*" /></label>
+          <label>Zoom template <input type="range" id="zoomRange" min="30" max="150" value="100" /></label>
+        </div>
+        <div class="workspace"><img id="templatePreview" alt="Preview template" /><canvas id="templateCanvas"></canvas></div>
+
+        <div class="grid2">
+          <div>
+            <h3>Kontrol Sensor</h3>
+            <div class="row">
+              <label>Kotak aktif <select id="activeBoxSelect"></select></label>
+              <label>X <input id="boxX" type="number" min="0" max="1" step="0.001" /></label>
+              <label>Y <input id="boxY" type="number" min="0" max="1" step="0.001" /></label>
+              <label>W <input id="boxW" type="number" min="0.01" max="1" step="0.001" /></label>
+              <label>H <input id="boxH" type="number" min="0.01" max="1" step="0.001" /></label>
+              <button id="applyBoxBtn" type="button">Apply</button>
+            </div>
+          </div>
+          <div>
+            <h3>Setting OMR</h3>
+            <div class="row">
+              <label>Digit No Peserta <input id="noDigitCount" type="number" min="4" max="20" value="10" /></label>
+              <label>Arah No Peserta <select id="noDirection"><option value="vertical">Vertikal</option><option value="horizontal">Horizontal</option></select></label>
+              <label>Jumlah soal <input id="questionCount" type="number" min="1" max="200" value="40" /></label>
+              <label>Jumlah opsi <input id="optionCount" type="number" min="2" max="10" value="4" /></label>
+              <label>Threshold arsiran (0-255) <input id="markThreshold" type="number" min="0" max="255" value="22" /></label>
+            </div>
+          </div>
+        </div>
+
+        <h3>Area Soal (multi area)</h3>
+        <div class="row">
+          <label>Jumlah area <input id="answerAreaCount" type="number" min="1" max="3" value="2" /></label>
+          <button id="applyAreaCountBtn" type="button">Apply Area</button>
+        </div>
+        <table id="areaConfigTable"><thead><tr><th>Area</th><th>Aktif</th><th>Dari</th><th>Sampai</th><th>Box</th></tr></thead><tbody></tbody></table>
+      </section>
+
+      <section class="panel">
+        <h2>2) Sumber Scan</h2>
+        <div class="row"><label>Upload scan <input type="file" id="scanInput" accept="image/*" multiple /></label></div>
+        <div class="row"><input id="feederUrl" value="http://localhost:17777/api/next-scan" /><button id="pullFeederBtn">Ambil Feeder</button></div>
+        <div class="row feeder"><video id="video" autoplay playsinline></video></div>
+        <div class="row"><button id="startCameraBtn">Start Kamera</button><button id="captureBtn" disabled>Capture</button><button id="stopCameraBtn" disabled>Stop</button></div>
+      </section>
+
+      <section class="panel">
+        <h2>3) Database + Kunci</h2>
+        <div class="row"><textarea id="dbInput" rows="6" placeholder="nomor,nama,kelas,ruang,mapel"></textarea></div>
+        <div class="row"><label>Kunci jawaban <input id="answerKey" type="text" /></label><button id="loadDbBtn">Muat Database</button><span id="dbStatus">Belum ada data.</span></div>
+        <table id="dbTable"><thead><tr><th>Nomor</th><th>Nama</th><th>Kelas</th><th>Ruang</th><th>Mapel</th></tr></thead><tbody></tbody></table>
+      </section>
+
+      <section class="panel">
+        <h2>4) Backup / Restore</h2>
+        <div class="row"><button id="downloadBackupBtn">Download Backup</button><label>Import Backup <input type="file" id="importBackupInput" accept="application/json" /></label></div>
+        <div class="row"><button id="processBtn">Proses Semua</button><button id="downloadBtn" disabled>Download Excel</button></div>
+      </section>
+    </div>
+
+    <div id="resultTab" class="tab-panel">
+      <section class="panel">
+        <h2>Hasil Scan</h2>
+        <pre id="log"></pre>
+        <table id="resultTable"><thead><tr><th>File</th><th>No</th><th>Nama</th><th>Kelas</th><th>Jawaban</th><th>Benar</th><th>Nilai</th><th>Orientasi</th></tr></thead><tbody></tbody></table>
+      </section>
+    </div>
+
+    <div id="previewTab" class="tab-panel">
+      <section class="panel">
+        <h2>Preview LJK + Sensor</h2>
+        <canvas id="previewCanvas"></canvas>
+        <p class="hint">Menampilkan scan terakhir dengan overlay sensor lingkaran.</p>
+      </section>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

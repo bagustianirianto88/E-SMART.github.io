@@ -36,6 +36,7 @@
             <h3>Kontrol Sensor</h3>
             <div class="row">
               <label>Kotak aktif <select id="activeBoxSelect"></select></label>
+              <label><input id="anchorMode" type="checkbox" checked /> Ikuti anchor sensor atas-bawah</label>
               <label>X <input id="boxX" type="number" min="0" max="1" step="0.001" /></label>
               <label>Y <input id="boxY" type="number" min="0" max="1" step="0.001" /></label>
               <label>W <input id="boxW" type="number" min="0.01" max="1" step="0.001" /></label>
@@ -101,9 +102,12 @@
           <button id="authLogoutBtn" type="button">Logout</button>
           <button id="cloudSaveBtn" type="button">Simpan Progress Cloud</button>
           <button id="cloudLoadBtn" type="button">Load Progress Cloud</button>
+          <button id="saveDbCloudBtn" type="button">Simpan DB Siswa</button>
+          <button id="loadDbCloudBtn" type="button">Load DB Siswa</button>
           <span id="authStatus">Belum login</span>
         </div>
-        <p class="hint">Buat tabel <code>scanner_progress</code> dengan kolom: <code>user_id uuid primary key</code>, <code>backup_json jsonb</code>, <code>updated_at timestamptz</code>.</p>
+        <p class="hint">Gunakan <b>Project URL</b> sebagai Supabase URL, dan <b>Publishable key</b> sebagai Anon Key. Direct connection string tidak dipakai di browser.</p>
+        <p class="hint">Tabel yang dipakai: <code>scanner_progress(user_id uuid primary key, backup_json jsonb, updated_at timestamptz)</code> dan <code>students(nomor text primary key, nama text, kelas text)</code>.</p>
       </section>
     </div>
 

@@ -11,6 +11,8 @@ const state = {
   previewData: null,
   supabase: null,
   user: null,
+  useAnchorLayout: true,
+  relativeBoxes: {},
   boxes: {
     noPeserta: { x: 0.07, y: 0.12, w: 0.24, h: 0.2, color: '#22c55e', label: 'NO' },
     top1: { x: 0.08, y: 0.03, w: 0.06, h: 0.035, color: '#38bdf8', label: 'TOP1' },
@@ -42,7 +44,9 @@ const el = {
   resultHead: document.querySelector('#resultTable thead'), resultBody: document.querySelector('#resultTable tbody'), log: $('log'),
   supabaseUrl: $('supabaseUrl'), supabaseKey: $('supabaseKey'), authEmail: $('authEmail'), authPassword: $('authPassword'),
   authLoginBtn: $('authLoginBtn'), authSignupBtn: $('authSignupBtn'), authLogoutBtn: $('authLogoutBtn'), cloudSaveBtn: $('cloudSaveBtn'),
-  cloudLoadBtn: $('cloudLoadBtn'), authStatus: $('authStatus')
+  cloudLoadBtn: $('cloudLoadBtn'), authStatus: $('authStatus'),
+  saveDbCloudBtn: $('saveDbCloudBtn'), loadDbCloudBtn: $('loadDbCloudBtn'),
+  anchorMode: $('anchorMode')
 };
 const tctx = el.templateCanvas.getContext('2d');
 const pctx = el.previewCanvas.getContext('2d');
@@ -63,6 +67,42 @@ function normalizeAreas() {
   act.forEach((a, i) => { a.start = i * chunk + 1; a.end = Math.min(total, (i + 1) * chunk); });
 }
 
+function anchorBounds(boxes) {
+  const left = Math.min(boxes.top1.x, boxes.bot1.x);
+  const right = Math.max(boxes.top3.x + boxes.top3.w, boxes.bot2.x + boxes.bot2.w);
+  const top = Math.min(boxes.top1.y, boxes.top2.y, boxes.top3.y);
+  const bottom = Math.max(boxes.bot1.y + boxes.bot1.h, boxes.bot2.y + boxes.bot2.h);
+  return { left, right, top, bottom, width: Math.max(0.01, right - left), height: Math.max(0.01, bottom - top) };
+}
+
+function captureRelativeLayout() {
+  const b = anchorBounds(state.boxes);
+  ['noPeserta', 'ans1', 'ans2', 'ans3'].forEach((k) => {
+    const box = state.boxes[k];
+    state.relativeBoxes[k] = {
+      x: (box.x - b.left) / b.width,
+      y: (box.y - b.top) / b.height,
+      w: box.w / b.width,
+      h: box.h / b.height,
+    };
+  });
+}
+
+function resolveBoxes() {
+  const boxes = JSON.parse(JSON.stringify(state.boxes));
+  if (!state.useAnchorLayout) return boxes;
+  const b = anchorBounds(boxes);
+  ['noPeserta', 'ans1', 'ans2', 'ans3'].forEach((k) => {
+    const rel = state.relativeBoxes[k];
+    if (!rel) return;
+    boxes[k].x = clamp(b.left + rel.x * b.width, 0, 0.99);
+    boxes[k].y = clamp(b.top + rel.y * b.height, 0, 0.99);
+    boxes[k].w = clamp(rel.w * b.width, 0.01, 1 - boxes[k].x);
+    boxes[k].h = clamp(rel.h * b.height, 0.01, 1 - boxes[k].y);
+  });
+  return boxes;
+}
+
 function initBoxOptions() {
   el.activeBoxSelect.innerHTML = '';
   Object.keys(state.boxes).forEach((k) => {
@@ -72,15 +112,18 @@ function initBoxOptions() {
   syncBoxForm();
 }
 function syncBoxForm() {
-  const b = state.boxes[el.activeBoxSelect.value]; if (!b) return;
+  const boxes = resolveBoxes();
+  const b = boxes[el.activeBoxSelect.value]; if (!b) return;
   el.boxX.value = b.x.toFixed(3); el.boxY.value = b.y.toFixed(3); el.boxW.value = b.w.toFixed(3); el.boxH.value = b.h.toFixed(3);
 }
 function applyBoxRealtime() {
-  const b = state.boxes[el.activeBoxSelect.value]; if (!b) return;
+  const key = el.activeBoxSelect.value;
+  const b = state.boxes[key]; if (!b) return;
   b.x = clamp(parseFloat(el.boxX.value) || b.x, 0, 0.98);
   b.y = clamp(parseFloat(el.boxY.value) || b.y, 0, 0.98);
   b.w = clamp(parseFloat(el.boxW.value) || b.w, 0.01, 1 - b.x);
   b.h = clamp(parseFloat(el.boxH.value) || b.h, 0.01, 1 - b.y);
+  captureRelativeLayout();
   drawTemplate();
   drawPreviewScan();
 }
@@ -111,6 +154,7 @@ function drawCircleGrid(ctx, w, h, box, cols, rows, color, showHandle = false) {
 
 function drawTemplate() {
   if (!state.templateImage) return;
+  const boxes = resolveBoxes();
   const img = state.templateImage;
   const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
   const cssW = w * state.zoom, cssH = h * state.zoom;
@@ -120,24 +164,25 @@ function drawTemplate() {
   tctx.clearRect(0, 0, w, h);
 
   ['top1','top2','top3','bot1','bot2'].forEach((k) => {
-    const b = state.boxes[k];
+    const b = boxes[k];
     tctx.strokeStyle = b.color; tctx.lineWidth = 2;
     tctx.strokeRect(b.x * w, b.y * h, b.w * w, b.h * h);
   });
 
   const digits = Math.max(4, +el.noDigitCount.value || 10);
-  drawCircleGrid(tctx, w, h, state.boxes.noPeserta, el.noDirection.value === 'vertical' ? digits : 10, el.noDirection.value === 'vertical' ? 10 : digits, state.boxes.noPeserta.color, el.activeBoxSelect.value === 'noPeserta');
+  drawCircleGrid(tctx, w, h, boxes.noPeserta, el.noDirection.value === 'vertical' ? digits : 10, el.noDirection.value === 'vertical' ? 10 : digits, boxes.noPeserta.color, el.activeBoxSelect.value === 'noPeserta');
 
   const opt = Math.max(2, +el.optionCount.value || 4);
   const totalQ = Math.max(1, +el.questionCount.value || 40);
   state.answerAreas.filter(a=>a.active).sort((a,b)=>a.start-b.start).forEach((a)=>{
     const q = clamp(a.end,1,totalQ)-clamp(a.start,1,totalQ)+1;
-    drawCircleGrid(tctx, w, h, state.boxes[a.id], opt, Math.max(1,q), state.boxes[a.id].color, el.activeBoxSelect.value === a.id);
+    drawCircleGrid(tctx, w, h, boxes[a.id], opt, Math.max(1,q), boxes[a.id].color, el.activeBoxSelect.value === a.id);
   });
 }
 
 function drawPreviewScan() {
   if (!state.previewData) return;
+  const boxes = resolveBoxes();
   const { canvas, answers, choices } = state.previewData;
   el.previewCanvas.width = canvas.width; el.previewCanvas.height = canvas.height;
   pctx.drawImage(canvas, 0, 0);
@@ -147,7 +192,7 @@ function drawPreviewScan() {
   const totalQ = Math.max(1, +el.questionCount.value || 40);
 
   state.answerAreas.filter(a=>a.active).forEach((a) => {
-    const box = state.boxes[a.id];
+    const box = boxes[a.id];
     const qCount = clamp(a.end,1,totalQ)-clamp(a.start,1,totalQ)+1;
     const x = box.x * w, y = box.y * h, bw = box.w * w, bh = box.h * h;
     const r = Math.min(bw / opt, bh / qCount) * 0.26;
@@ -156,7 +201,7 @@ function drawPreviewScan() {
       for (let oi = 0; oi < opt; oi++) {
         const cx = x + (oi + 0.5) * (bw / opt);
         const cy = y + (qi + 0.5) * (bh / qCount);
-        pctx.strokeStyle = state.boxes[a.id].color; pctx.lineWidth = 1.2;
+        pctx.strokeStyle = boxes[a.id].color; pctx.lineWidth = 1.2;
         pctx.beginPath(); pctx.arc(cx, cy, r, 0, Math.PI * 2); pctx.stroke();
         const pick = choices[qNo - 1] ?? [];
         if (Array.isArray(pick) && pick.includes(oi) && answers[qNo - 1] !== '-') {
@@ -169,7 +214,10 @@ function drawPreviewScan() {
 }
 
 function getTemplatePos(e){ const r=el.templateCanvas.getBoundingClientRect(); return {x:(e.clientX-r.left)/r.width,y:(e.clientY-r.top)/r.height}; }
-function hitBox(p){ return Object.entries(state.boxes).find(([,b])=>p.x>=b.x&&p.x<=b.x+b.w&&p.y>=b.y&&p.y<=b.y+b.h)?.[0] || null; }
+function hitBox(p){
+  const boxes = resolveBoxes();
+  return Object.entries(boxes).find(([,b])=>p.x>=b.x&&p.x<=b.x+b.w&&p.y>=b.y&&p.y<=b.y+b.h)?.[0] || null;
+}
 
 function parseDb(raw){
   const m=new Map();
@@ -184,14 +232,14 @@ function renderDb(){ el.dbTableBody.innerHTML=''; [...state.db.values()].forEach
 function roi(gray, box){ const x=Math.floor(gray.cols*box.x),y=Math.floor(gray.rows*box.y),w=Math.max(1,Math.floor(gray.cols*box.w)),h=Math.max(1,Math.floor(gray.rows*box.h)); return gray.roi(new cv.Rect(x,y,Math.min(w,gray.cols-x),Math.min(h,gray.rows-y))); }
 function meanCircleInk(mat,x,y,r){ let sum=0,n=0; for(let yy=Math.max(0,Math.floor(y-r));yy<=Math.min(mat.rows-1,Math.ceil(y+r));yy++) for(let xx=Math.max(0,Math.floor(x-r));xx<=Math.min(mat.cols-1,Math.ceil(x+r));xx++){ const dx=xx-x,dy=yy-y; if(dx*dx+dy*dy<=r*r){sum+=mat.ucharPtr(yy,xx)[0];n++;}} return 255-(n?sum/n:255); }
 
-function sensorStats(gray, key){ const r=roi(gray,state.boxes[key]); const mean=255-cv.mean(r)[0]; const bw=new cv.Mat(); cv.threshold(r,bw,0,255,cv.THRESH_BINARY_INV+cv.THRESH_OTSU); const fill=(cv.countNonZero(bw)/(bw.rows*bw.cols))*100; r.delete(); bw.delete(); return {mean,fill}; }
-function detectOrientationRobust(gray){
+function sensorStats(gray, boxes, key){ const r=roi(gray,boxes[key]); const mean=255-cv.mean(r)[0]; const bw=new cv.Mat(); cv.threshold(r,bw,0,255,cv.THRESH_BINARY_INV+cv.THRESH_OTSU); const fill=(cv.countNonZero(bw)/(bw.rows*bw.cols))*100; r.delete(); bw.delete(); return {mean,fill}; }
+function detectOrientationRobust(gray, boxes){
   const orientTh = Math.max(0, +el.orientThreshold.value || 18);
   const fillTh = Math.max(0, +el.sensorBlackThreshold.value || 8);
   let current = gray.clone();
   for(let tries=0; tries<4; tries++){
-    const top = ['top1','top2','top3'].map(k=>sensorStats(current,k));
-    const bot = ['bot1','bot2'].map(k=>sensorStats(current,k));
+    const top = ['top1','top2','top3'].map(k=>sensorStats(current,boxes,k));
+    const bot = ['bot1','bot2'].map(k=>sensorStats(current,boxes,k));
     const topOk = top.every(s=>s.mean>=orientTh && s.fill>=fillTh);
     const botOk = bot.every(s=>s.mean>=orientTh && s.fill>=fillTh);
     if(topOk && !botOk) return {gray: current.clone(), orientation: `normal@${tries}`};
@@ -201,9 +249,9 @@ function detectOrientationRobust(gray){
   return {gray: current.clone(), orientation:'fallback-rotated'};
 }
 
-function decodeNo(gray){
+function decodeNo(gray, boxes){
   const digits=Math.max(4,+el.noDigitCount.value||10), markTh=Math.max(0,+el.markThreshold.value||22);
-  const r=roi(gray,state.boxes.noPeserta), bw=new cv.Mat();
+  const r=roi(gray,boxes.noPeserta), bw=new cv.Mat();
   cv.GaussianBlur(r,r,new cv.Size(3,3),0); cv.adaptiveThreshold(r,bw,255,cv.ADAPTIVE_THRESH_GAUSSIAN_C,cv.THRESH_BINARY_INV,31,4);
   const out=[], margins=[];
   const vertical = el.noDirection.value==='vertical';
@@ -223,14 +271,14 @@ function decodeNo(gray){
   return {text: out.join(''), margins};
 }
 
-function decodeAnswers(gray){
+function decodeAnswers(gray, boxes){
   const totalQ=Math.max(1,+el.questionCount.value||40), opt=Math.max(2,+el.optionCount.value||4), letters='ABCDEFGHIJKLMNOPQRSTUVWXYZ'.slice(0,opt).split('');
   const markTh=Math.max(0,+el.markThreshold.value||22);
   const answers=Array(totalQ).fill('-'), choices=Array(totalQ).fill(0).map(()=>[]), margins=Array(totalQ).fill(0);
 
   state.answerAreas.filter(a=>a.active).sort((a,b)=>a.start-b.start).forEach((a)=>{
     const st=clamp(a.start,1,totalQ), en=clamp(a.end,st,totalQ), qc=en-st+1;
-    const r=roi(gray,state.boxes[a.id]), bw=new cv.Mat();
+    const r=roi(gray,boxes[a.id]), bw=new cv.Mat();
     cv.GaussianBlur(r,r,new cv.Size(3,3),0); cv.adaptiveThreshold(r,bw,255,cv.ADAPTIVE_THRESH_GAUSSIAN_C,cv.THRESH_BINARY_INV,31,4);
     for(let qi=0; qi<qc; qi++){
       const oW=bw.cols/opt, qH=bw.rows/qc;
@@ -281,10 +329,11 @@ function renderResults(){
 }
 
 async function processOne(item){
+  const boxes = resolveBoxes();
   const src=cv.imread(item.canvas), gray=new cv.Mat(); cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY);
-  const ori=detectOrientationRobust(gray);
-  const no=decodeNo(ori.gray);
-  const ans=decodeAnswers(ori.gray);
+  const ori=detectOrientationRobust(gray, boxes);
+  const no=decodeNo(ori.gray, boxes);
+  const ans=decodeAnswers(ori.gray, boxes);
   const sc=scoreAnswers(ans.answers);
   const siswa=state.db.get(no.text)||{nama:'-',kelas:'-'};
   src.delete(); gray.delete(); ori.gray.delete();
@@ -294,7 +343,7 @@ async function processOne(item){
   return result;
 }
 
-function backup(){ return {version:7, boxes:state.boxes, answer_areas:state.answerAreas, zoom:state.zoom, mark_threshold:el.markThreshold.value, orient_threshold:el.orientThreshold.value, sensor_black_threshold:el.sensorBlackThreshold.value, no_digit_count:el.noDigitCount.value, no_direction:el.noDirection.value, question_count:el.questionCount.value, option_count:el.optionCount.value, db_csv:el.dbInput.value, answer_key:el.answerKey.value, results:state.results}; }
+function backup(){ return {version:8, boxes:state.boxes, answer_areas:state.answerAreas, zoom:state.zoom, mark_threshold:el.markThreshold.value, orient_threshold:el.orientThreshold.value, sensor_black_threshold:el.sensorBlackThreshold.value, no_digit_count:el.noDigitCount.value, no_direction:el.noDirection.value, question_count:el.questionCount.value, option_count:el.optionCount.value, db_csv:el.dbInput.value, answer_key:el.answerKey.value, results:state.results, use_anchor_layout: state.useAnchorLayout, relative_boxes: state.relativeBoxes}; }
 
 function updatePreviewResultSync(){
   if (!state.previewData) return;
@@ -381,6 +430,30 @@ async function loadCloudProgress(){
   log('Progress cloud berhasil dimuat.');
 }
 
+async function saveDbToSupabase(){
+  if (!state.supabase) initSupabaseClient();
+  if (!state.supabase) return;
+  const rows = [...state.db.values()].map((s) => ({ nomor: String(s.nomor), nama: dash(s.nama), kelas: dash(s.kelas) }));
+  if (!rows.length) return log('Database lokal kosong. Isi dulu lalu klik Muat Database.');
+  const { error } = await state.supabase.from('students').upsert(rows, { onConflict: 'nomor' });
+  if (error) return log(`Simpan students gagal: ${error.message}`);
+  log(`Database siswa tersimpan ke Supabase: ${rows.length} baris.`);
+}
+
+async function loadDbFromSupabase(){
+  if (!state.supabase) initSupabaseClient();
+  if (!state.supabase) return;
+  const { data, error } = await state.supabase.from('students').select('nomor,nama,kelas').order('nomor', { ascending: true });
+  if (error) return log(`Load students gagal: ${error.message}`);
+  if (!data?.length) return log('Tabel students kosong.');
+  const lines = data.map((r) => `${dash(r.nomor)},${dash(r.nama)},${dash(r.kelas)}`);
+  el.dbInput.value = lines.join('\n');
+  state.db = parseDb(el.dbInput.value);
+  renderDb();
+  el.dbStatus.textContent = `Database: ${state.db.size}`;
+  log(`Database siswa dimuat dari Supabase: ${state.db.size} baris.`);
+}
+
 function applyBackupData(d){
   if(d.boxes) Object.keys(state.boxes).forEach(k=>{ if(d.boxes[k]) state.boxes[k]={...state.boxes[k],...d.boxes[k]};});
   if(Array.isArray(d.answer_areas)) state.answerAreas=d.answer_areas;
@@ -392,6 +465,8 @@ function applyBackupData(d){
   if(d.no_direction) el.noDirection.value=d.no_direction;
   if(d.question_count) el.questionCount.value=d.question_count;
   if(d.option_count) el.optionCount.value=d.option_count;
+  if (typeof d.use_anchor_layout === 'boolean') { state.useAnchorLayout = d.use_anchor_layout; if (el.anchorMode) el.anchorMode.checked = state.useAnchorLayout; }
+  if (d.relative_boxes) state.relativeBoxes = d.relative_boxes;
   if(d.db_csv){ el.dbInput.value=d.db_csv; state.db=parseDb(d.db_csv); renderDb(); }
   if(d.answer_key) el.answerKey.value=d.answer_key;
   if(Array.isArray(d.results)){ state.results=d.results; renderResults(); }
@@ -400,8 +475,10 @@ function applyBackupData(d){
 
 // events
 initBoxOptions(); normalizeAreas(); renderAreaConfig();
+captureRelativeLayout();
 document.querySelectorAll('.tab-btn').forEach(b=>b.addEventListener('click',()=>activateTab(b.dataset.tab)));
 activateTab('configTab');
+if (el.anchorMode) el.anchorMode.checked = state.useAnchorLayout;
 
 el.templateInput.addEventListener('change',(e)=>{ const f=e.target.files?.[0]; if(!f) return; const img=new Image(); img.onload=()=>{state.templateImage=img; el.templatePreview.src=img.src; drawTemplate();}; img.src=URL.createObjectURL(f);});
 el.zoomRange.addEventListener('input',()=>{ state.zoom=(+el.zoomRange.value||100)/100; drawTemplate(); });
@@ -419,12 +496,20 @@ el.areaConfigTableBody.addEventListener('input',(e)=>{ const i=+e.target.dataset
 el.areaConfigTableBody.addEventListener('change',(e)=>{ const i=+e.target.dataset.i, k=e.target.dataset.k; if(Number.isNaN(i)||!k) return; state.answerAreas[i][k]=k==='active'?e.target.checked:+e.target.value; drawTemplate(); drawPreviewScan(); });
 el.applyAreaCountBtn.addEventListener('click',()=>{ const c=clamp(+el.answerAreaCount.value||2,1,3); state.answerAreas.forEach((a,i)=>a.active=i<c); normalizeAreas(); renderAreaConfig(); drawTemplate(); });
 
-el.templateCanvas.addEventListener('mousedown',(e)=>{ const p=getTemplatePos(e), k=hitBox(p); if(!k) return; el.activeBoxSelect.value=k; syncBoxForm(); const b=state.boxes[k]; if(p.x>b.x+b.w-0.02&&p.y>b.y+b.h-0.02) state.resizeKey=k; else {state.dragKey=k; b.offX=p.x-b.x; b.offY=p.y-b.y;} });
+el.templateCanvas.addEventListener('mousedown',(e)=>{
+  const p=getTemplatePos(e), k=hitBox(p); if(!k) return;
+  if (state.useAnchorLayout && ['noPeserta','ans1','ans2','ans3'].includes(k)) state.boxes[k] = { ...resolveBoxes()[k] };
+  el.activeBoxSelect.value=k; syncBoxForm();
+  const b=state.boxes[k];
+  if(p.x>b.x+b.w-0.02&&p.y>b.y+b.h-0.02) state.resizeKey=k;
+  else {state.dragKey=k; b.offX=p.x-b.x; b.offY=p.y-b.y;}
+});
 window.addEventListener('mouseup',()=>{ state.dragKey=null; state.resizeKey=null; });
-window.addEventListener('mousemove',(e)=>{ if(!state.dragKey&&!state.resizeKey) return; const p=getTemplatePos(e); if(state.dragKey){ const b=state.boxes[state.dragKey]; b.x=clamp(p.x-b.offX,0,1-b.w); b.y=clamp(p.y-b.offY,0,1-b.h);} if(state.resizeKey){ const b=state.boxes[state.resizeKey]; b.w=clamp(p.x-b.x,0.01,1-b.x); b.h=clamp(p.y-b.y,0.01,1-b.y);} syncBoxForm(); drawTemplate(); drawPreviewScan(); });
+window.addEventListener('mousemove',(e)=>{ if(!state.dragKey&&!state.resizeKey) return; const p=getTemplatePos(e); if(state.dragKey){ const b=state.boxes[state.dragKey]; b.x=clamp(p.x-b.offX,0,1-b.w); b.y=clamp(p.y-b.offY,0,1-b.h);} if(state.resizeKey){ const b=state.boxes[state.resizeKey]; b.w=clamp(p.x-b.x,0.01,1-b.x); b.h=clamp(p.y-b.y,0.01,1-b.y);} captureRelativeLayout(); syncBoxForm(); drawTemplate(); drawPreviewScan(); });
 
 el.previewCanvas.addEventListener('click',(e)=>{
   if(!state.previewData) return;
+  const boxes = resolveBoxes();
   const rect=el.previewCanvas.getBoundingClientRect();
   const px=(e.clientX-rect.left)/rect.width;
   const py=(e.clientY-rect.top)/rect.height;
@@ -432,7 +517,7 @@ el.previewCanvas.addEventListener('click',(e)=>{
   const totalQ=Math.max(1,+el.questionCount.value||40);
   const letters='ABCDEFGHIJKLMNOPQRSTUVWXYZ'.slice(0,opt).split('');
   for(const a of state.answerAreas.filter(x=>x.active)){
-    const b=state.boxes[a.id];
+    const b=boxes[a.id];
     if(px>=b.x&&px<=b.x+b.w&&py>=b.y&&py<=b.y+b.h){
       const qCount=clamp(a.end,1,totalQ)-clamp(a.start,1,totalQ)+1;
       const relX=(px-b.x)/b.w;
@@ -472,6 +557,17 @@ el.authSignupBtn?.addEventListener('click', authSignup);
 el.authLogoutBtn?.addEventListener('click', authLogout);
 el.cloudSaveBtn?.addEventListener('click', saveCloudProgress);
 el.cloudLoadBtn?.addEventListener('click', loadCloudProgress);
+el.saveDbCloudBtn?.addEventListener('click', saveDbToSupabase);
+el.loadDbCloudBtn?.addEventListener('click', loadDbFromSupabase);
+el.anchorMode?.addEventListener('change', () => {
+  state.useAnchorLayout = !!el.anchorMode.checked;
+  captureRelativeLayout();
+  syncBoxForm();
+  drawTemplate();
+  drawPreviewScan();
+  log(`Mode anchor sensor: ${state.useAnchorLayout ? 'aktif' : 'nonaktif'}.`);
+});
 
 (function waitCV(){ if(window.cv?.Mat){ state.cvReady=true; log('OpenCV siap'); } else setTimeout(waitCV,250); })();
-log('Siap: sensor real-time, preview bisa edit multi-jawaban, ekspor kolom per soal, dan login Supabase.');
+log('Supabase: pakai Project URL + Publishable key (anon). Direct connection string tidak dipakai di browser.');
+log('Siap: deteksi sensor atas-bawah lebih dulu, layout anchor aktif, preview edit multi-jawaban, dan sinkron cloud.');

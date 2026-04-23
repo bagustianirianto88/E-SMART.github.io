@@ -4,18 +4,19 @@ Web statis untuk GitHub Pages yang mendukung proses scanning LJK Evalbee untuk k
 
 ## Fitur terbaru
 
-- Konfigurasi sensor langsung setelah upload template LJK (drag-and-drop pada canvas).
+- Konfigurasi sensor langsung setelah upload template LJK (drag-and-drop pada canvas overlay).
+- Preview template tampil jelas (`img`) dan sensor diatur di layer `canvas`.
 - Sensor orientasi configurable dengan pola:
   - **Atas: 3 kotak**
   - **Bawah: 2 kotak**
-- Area **nomor peserta** bisa digeser manual mengikuti format LJK yang dipakai.
-- Area **jawaban** juga bisa digeser untuk auto-koreksi nilai.
+- Area **nomor peserta** dan **jawaban** bisa digeser manual.
 - Sumber scan:
   - Upload batch gambar.
   - Hardware paper feeder via **bridge lokal HTTP** (contoh endpoint default `http://localhost:17777/api/next-scan`).
   - Kamera browser sebagai fallback.
 - Database peserta terlihat dalam tabel setelah dimuat.
 - Penilaian otomatis berbasis kunci jawaban, lalu ekspor hasil ke Excel.
+- Fitur **backup/restore JSON** agar pengerjaan bisa dilanjutkan kapan saja.
 
 ## Format database peserta
 
@@ -26,6 +27,14 @@ CSV (tanpa header wajib):
 Contoh:
 
 `12345,Budi Santoso,9A,Ruang 1,Matematika`
+
+## File pendukung SAS/STS
+
+Folder `sas-support/` berisi:
+
+- `template-database-sas.csv` (contoh data siswa)
+- `checklist-persiapan-sas-sts.md` (panduan persiapan kegiatan)
+- `backup-format-example.json` (contoh struktur backup)
 
 ## Menjalankan lokal
 

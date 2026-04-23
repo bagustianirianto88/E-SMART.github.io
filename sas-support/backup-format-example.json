@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "exported_at": "2026-04-23T00:00:00.000Z",
+  "template_file": "template-ljk.png",
+  "boxes": {
+    "noPeserta": { "x": 0.08, "y": 0.14, "w": 0.26, "h": 0.11 },
+    "answers": { "x": 0.42, "y": 0.18, "w": 0.50, "h": 0.72 },
+    "top1": { "x": 0.06, "y": 0.03, "w": 0.08, "h": 0.04 },
+    "top2": { "x": 0.46, "y": 0.03, "w": 0.08, "h": 0.04 },
+    "top3": { "x": 0.86, "y": 0.03, "w": 0.08, "h": 0.04 },
+    "bot1": { "x": 0.24, "y": 0.93, "w": 0.08, "h": 0.04 },
+    "bot2": { "x": 0.68, "y": 0.93, "w": 0.08, "h": 0.04 }
+  },
+  "db_csv": "10001,Andi Pratama,9A,Ruang 1,Matematika",
+  "answer_key": "ABCDEABCDEABCDEABCDE",
+  "question_count": 20,
+  "results": []
+}

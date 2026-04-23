@@ -4,6 +4,7 @@ const state = {
   results: [],
   db: new Map(),
   templateImage: null,
+  templateFileName: '',
   stream: null,
   dragKey: null,
   boxes: {
@@ -19,6 +20,7 @@ const state = {
 
 const el = {
   templateInput: document.getElementById('templateInput'),
+  templatePreview: document.getElementById('templatePreview'),
   templateCanvas: document.getElementById('templateCanvas'),
   scanInput: document.getElementById('scanInput'),
   feederUrl: document.getElementById('feederUrl'),
@@ -33,6 +35,8 @@ const el = {
   dbTableBody: document.querySelector('#dbTable tbody'),
   answerKey: document.getElementById('answerKey'),
   questionCount: document.getElementById('questionCount'),
+  downloadBackupBtn: document.getElementById('downloadBackupBtn'),
+  importBackupInput: document.getElementById('importBackupInput'),
   processBtn: document.getElementById('processBtn'),
   downloadBtn: document.getElementById('downloadBtn'),
   resultBody: document.querySelector('#resultTable tbody'),
@@ -63,30 +67,37 @@ function renderDb() {
   });
 }
 
+function getCanvasClientRatio(evt) {
+  const r = el.templateCanvas.getBoundingClientRect();
+  const xr = (evt.clientX - r.left) / r.width;
+  const yr = (evt.clientY - r.top) / r.height;
+  return { x: xr, y: yr };
+}
+
 function drawTemplate() {
   if (!state.templateImage) return;
   const img = state.templateImage;
+  const cssWidth = el.templatePreview.clientWidth || img.width;
+  const scale = cssWidth / img.width;
+  const cssHeight = img.height * scale;
+
   el.templateCanvas.width = img.width;
   el.templateCanvas.height = img.height;
-  tctx.drawImage(img, 0, 0);
+  el.templateCanvas.style.width = `${cssWidth}px`;
+  el.templateCanvas.style.height = `${cssHeight}px`;
+
+  tctx.clearRect(0, 0, img.width, img.height);
   Object.values(state.boxes).forEach((b) => {
     const x = b.x * img.width, y = b.y * img.height, w = b.w * img.width, h = b.h * img.height;
     tctx.strokeStyle = b.color;
     tctx.lineWidth = 3;
     tctx.strokeRect(x, y, w, h);
     tctx.fillStyle = b.color;
-    tctx.fillRect(x, y - 18, 56, 18);
+    tctx.fillRect(x, Math.max(0, y - 18), 60, 18);
     tctx.fillStyle = '#fff';
     tctx.font = '12px sans-serif';
-    tctx.fillText(b.label, x + 6, y - 5);
+    tctx.fillText(b.label, x + 6, y - 5 < 10 ? 12 : y - 5);
   });
-}
-
-function mouseToRatio(evt) {
-  const r = el.templateCanvas.getBoundingClientRect();
-  const xr = (evt.clientX - r.left) / r.width;
-  const yr = (evt.clientY - r.top) / r.height;
-  return { x: xr, y: yr };
 }
 
 function hitTest(pos) {
@@ -95,12 +106,11 @@ function hitTest(pos) {
   }
   return null;
 }
-
-function clamp(v, min = 0, max = 1) { return Math.max(min, Math.min(max, v)); }
+const clamp = (v, min = 0, max = 1) => Math.max(min, Math.min(max, v));
 
 el.templateCanvas.addEventListener('mousedown', (e) => {
   if (!state.templateImage) return;
-  const p = mouseToRatio(e);
+  const p = getCanvasClientRatio(e);
   state.dragKey = hitTest(p);
   if (state.dragKey) {
     const b = state.boxes[state.dragKey];
@@ -111,12 +121,13 @@ el.templateCanvas.addEventListener('mousedown', (e) => {
 window.addEventListener('mouseup', () => { state.dragKey = null; });
 window.addEventListener('mousemove', (e) => {
   if (!state.dragKey || !state.templateImage) return;
-  const p = mouseToRatio(e);
+  const p = getCanvasClientRatio(e);
   const b = state.boxes[state.dragKey];
   b.x = clamp(p.x - b.offsetX, 0, 1 - b.w);
   b.y = clamp(p.y - b.offsetY, 0, 1 - b.h);
   drawTemplate();
 });
+window.addEventListener('resize', drawTemplate);
 
 async function fileToImage(file) {
   return new Promise((resolve, reject) => {
@@ -130,9 +141,12 @@ async function fileToImage(file) {
 el.templateInput.addEventListener('change', async (e) => {
   const file = e.target.files?.[0];
   if (!file) return;
-  state.templateImage = await fileToImage(file);
-  drawTemplate();
-  log(`Template dimuat: ${file.name}. Silakan geser sensor di canvas.`);
+  const img = await fileToImage(file);
+  state.templateImage = img;
+  state.templateFileName = file.name;
+  el.templatePreview.src = img.src;
+  requestAnimationFrame(drawTemplate);
+  log(`Template dimuat: ${file.name}. Preview sudah tampil dan sensor siap digeser.`);
 });
 
 el.scanInput.addEventListener('change', async (e) => {
@@ -326,6 +340,57 @@ el.downloadBtn.addEventListener('click', () => {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Hasil SAS-STS');
   XLSX.writeFile(wb, `hasil-sas-sts-${new Date().toISOString().slice(0, 10)}.xlsx`);
+});
+
+el.downloadBackupBtn.addEventListener('click', () => {
+  const backup = {
+    version: 1,
+    exported_at: new Date().toISOString(),
+    template_file: state.templateFileName,
+    boxes: state.boxes,
+    db_csv: el.dbInput.value,
+    answer_key: el.answerKey.value,
+    question_count: el.questionCount.value,
+    results: state.results,
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `backup-sas-sts-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  log('Backup berhasil di-download.');
+});
+
+el.importBackupInput.addEventListener('change', async (e) => {
+  const f = e.target.files?.[0];
+  if (!f) return;
+  try {
+    const raw = await f.text();
+    const data = JSON.parse(raw);
+    if (data.boxes) {
+      Object.keys(state.boxes).forEach((k) => {
+        if (data.boxes[k]) state.boxes[k] = { ...state.boxes[k], ...data.boxes[k] };
+      });
+    }
+    if (typeof data.db_csv === 'string') {
+      el.dbInput.value = data.db_csv;
+      state.db = parseDb(data.db_csv);
+      renderDb();
+      el.dbStatus.textContent = `Database termuat: ${state.db.size} peserta (dari backup).`;
+    }
+    if (typeof data.answer_key === 'string') el.answerKey.value = data.answer_key;
+    if (data.question_count) el.questionCount.value = data.question_count;
+    if (Array.isArray(data.results)) {
+      state.results = data.results;
+      renderResults();
+      el.downloadBtn.disabled = state.results.length === 0;
+    }
+    if (state.templateImage) drawTemplate();
+    log('Backup berhasil di-import. Lanjutkan pengerjaan Anda.');
+  } catch (err) {
+    log(`Import backup gagal: ${err.message}`);
+  }
 });
 
 (function waitCv() {

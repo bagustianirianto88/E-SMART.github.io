@@ -10,8 +10,9 @@ input,textarea,button{border-radius:8px;border:1px solid #b8c6d8;padding:.5rem}
 button{background:#1565c0;color:#fff;border:none;cursor:pointer}
 button:disabled{background:#92a6bd}
 .hint{font-size:.85rem;color:#475569}
-.workspace{border:1px dashed #9aaec6;border-radius:10px;overflow:auto;background:#0f172a;padding:.4rem}
-#templateCanvas{max-width:100%;display:block;background:#111}
+.workspace{position:relative;border:1px dashed #9aaec6;border-radius:10px;overflow:auto;background:#0f172a;padding:.4rem;min-height:240px}
+#templatePreview{display:block;max-width:100%;height:auto}
+#templateCanvas{position:absolute;left:.4rem;top:.4rem;display:block;max-width:calc(100% - .8rem);cursor:move}
 video{width:min(100%,420px);border-radius:8px;border:1px solid #c0cad8;background:#0f172a}
 #log{background:#0b1220;color:#bdf6ff;min-height:80px;max-height:180px;overflow:auto;border-radius:8px;padding:.7rem}
 table{width:100%;border-collapse:collapse;font-size:.9rem}

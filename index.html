@@ -21,9 +21,10 @@
         <label>Upload template LJK
           <input type="file" id="templateInput" accept="image/*" />
         </label>
-        <span class="hint">Geser kotak sensor langsung di template agar konfigurasi cepat dan akurat.</span>
+        <span class="hint">Setelah upload, gambar template akan tampil di bawah. Geser kotak sensor langsung di atas template.</span>
       </div>
       <div class="workspace">
+        <img id="templatePreview" alt="Preview template" />
         <canvas id="templateCanvas"></canvas>
       </div>
       <div class="grid2">
@@ -89,7 +90,18 @@
     </section>
 
     <section class="panel">
-      <h2>4) Proses, Nilai, dan Ekspor</h2>
+      <h2>4) Backup / Restore Pengerjaan</h2>
+      <div class="row">
+        <button id="downloadBackupBtn">Download Backup (.json)</button>
+        <label>Import Backup
+          <input type="file" id="importBackupInput" accept="application/json" />
+        </label>
+      </div>
+      <p class="hint">Backup menyimpan konfigurasi sensor, database, kunci jawaban, jumlah soal, dan hasil scan agar pekerjaan bisa dilanjutkan.</p>
+    </section>
+
+    <section class="panel">
+      <h2>5) Proses, Nilai, dan Ekspor</h2>
       <div class="row">
         <button id="processBtn">Proses Semua</button>
         <button id="downloadBtn" disabled>Download Excel</button>

@@ -7,6 +7,7 @@ const state = {
   templateFileName: '',
   stream: null,
   dragKey: null,
+  resizeKey: null,
   boxes: {
     noPeserta: { x: 0.08, y: 0.14, w: 0.26, h: 0.11, color: '#22c55e', label: 'NO' },
     answers: { x: 0.42, y: 0.18, w: 0.5, h: 0.72, color: '#a855f7', label: 'ANS' },
@@ -22,6 +23,15 @@ const el = {
   templateInput: document.getElementById('templateInput'),
   templatePreview: document.getElementById('templatePreview'),
   templateCanvas: document.getElementById('templateCanvas'),
+  activeBoxSelect: document.getElementById('activeBoxSelect'),
+  boxX: document.getElementById('boxX'),
+  boxY: document.getElementById('boxY'),
+  boxW: document.getElementById('boxW'),
+  boxH: document.getElementById('boxH'),
+  applyBoxBtn: document.getElementById('applyBoxBtn'),
+  noDigitCount: document.getElementById('noDigitCount'),
+  optionCount: document.getElementById('optionCount'),
+  optionDirection: document.getElementById('optionDirection'),
   scanInput: document.getElementById('scanInput'),
   feederUrl: document.getElementById('feederUrl'),
   pullFeederBtn: document.getElementById('pullFeederBtn'),
@@ -44,10 +54,40 @@ const el = {
 };
 const tctx = el.templateCanvas.getContext('2d');
 
+const clamp = (v, min = 0, max = 1) => Math.max(min, Math.min(max, v));
 const log = (m) => {
   el.log.textContent += `[${new Date().toLocaleTimeString('id-ID')}] ${m}\n`;
   el.log.scrollTop = el.log.scrollHeight;
 };
+
+function initBoxControls() {
+  Object.keys(state.boxes).forEach((k) => {
+    const opt = document.createElement('option');
+    opt.value = k;
+    opt.textContent = `${k} (${state.boxes[k].label})`;
+    el.activeBoxSelect.appendChild(opt);
+  });
+  el.activeBoxSelect.value = 'noPeserta';
+  syncBoxForm();
+}
+function syncBoxForm() {
+  const b = state.boxes[el.activeBoxSelect.value];
+  if (!b) return;
+  el.boxX.value = b.x.toFixed(3);
+  el.boxY.value = b.y.toFixed(3);
+  el.boxW.value = b.w.toFixed(3);
+  el.boxH.value = b.h.toFixed(3);
+}
+function applyBoxForm() {
+  const key = el.activeBoxSelect.value;
+  const b = state.boxes[key];
+  if (!b) return;
+  b.x = clamp(parseFloat(el.boxX.value) || b.x, 0, 0.98);
+  b.y = clamp(parseFloat(el.boxY.value) || b.y, 0, 0.98);
+  b.w = clamp(parseFloat(el.boxW.value) || b.w, 0.01, 1 - b.x);
+  b.h = clamp(parseFloat(el.boxH.value) || b.h, 0.01, 1 - b.y);
+  drawTemplate();
+}
 
 function parseDb(raw) {
   const map = new Map();
@@ -57,7 +97,6 @@ function parseDb(raw) {
   });
   return map;
 }
-
 function renderDb() {
   el.dbTableBody.innerHTML = '';
   [...state.db.values()].forEach((siswa) => {
@@ -69,17 +108,14 @@ function renderDb() {
 
 function getCanvasClientRatio(evt) {
   const r = el.templateCanvas.getBoundingClientRect();
-  const xr = (evt.clientX - r.left) / r.width;
-  const yr = (evt.clientY - r.top) / r.height;
-  return { x: xr, y: yr };
+  return { x: (evt.clientX - r.left) / r.width, y: (evt.clientY - r.top) / r.height };
 }
 
 function drawTemplate() {
   if (!state.templateImage) return;
   const img = state.templateImage;
   const cssWidth = el.templatePreview.clientWidth || img.width;
-  const scale = cssWidth / img.width;
-  const cssHeight = img.height * scale;
+  const cssHeight = img.height * (cssWidth / img.width);
 
   el.templateCanvas.width = img.width;
   el.templateCanvas.height = img.height;
@@ -87,16 +123,21 @@ function drawTemplate() {
   el.templateCanvas.style.height = `${cssHeight}px`;
 
   tctx.clearRect(0, 0, img.width, img.height);
-  Object.values(state.boxes).forEach((b) => {
+  Object.entries(state.boxes).forEach(([key, b]) => {
     const x = b.x * img.width, y = b.y * img.height, w = b.w * img.width, h = b.h * img.height;
     tctx.strokeStyle = b.color;
-    tctx.lineWidth = 3;
+    tctx.lineWidth = key === el.activeBoxSelect.value ? 4 : 2;
     tctx.strokeRect(x, y, w, h);
     tctx.fillStyle = b.color;
     tctx.fillRect(x, Math.max(0, y - 18), 60, 18);
     tctx.fillStyle = '#fff';
     tctx.font = '12px sans-serif';
     tctx.fillText(b.label, x + 6, y - 5 < 10 ? 12 : y - 5);
+    // resize handle
+    tctx.fillStyle = '#f8fafc';
+    tctx.strokeStyle = b.color;
+    tctx.fillRect(x + w - 8, y + h - 8, 12, 12);
+    tctx.strokeRect(x + w - 8, y + h - 8, 12, 12);
   });
 }
 
@@ -106,28 +147,52 @@ function hitTest(pos) {
   }
   return null;
 }
-const clamp = (v, min = 0, max = 1) => Math.max(min, Math.min(max, v));
+function resizeHandleHit(pos, key) {
+  const b = state.boxes[key];
+  const pad = 0.02;
+  return pos.x >= b.x + b.w - pad && pos.x <= b.x + b.w + pad && pos.y >= b.y + b.h - pad && pos.y <= b.y + b.h + pad;
+}
 
 el.templateCanvas.addEventListener('mousedown', (e) => {
   if (!state.templateImage) return;
   const p = getCanvasClientRatio(e);
-  state.dragKey = hitTest(p);
+  const key = hitTest(p);
+  if (!key) return;
+  el.activeBoxSelect.value = key;
+  syncBoxForm();
+  if (resizeHandleHit(p, key)) {
+    state.resizeKey = key;
+    return;
+  }
+  state.dragKey = key;
+  const b = state.boxes[key];
+  b.offsetX = p.x - b.x;
+  b.offsetY = p.y - b.y;
+});
+window.addEventListener('mouseup', () => {
+  state.dragKey = null;
+  state.resizeKey = null;
+});
+window.addEventListener('mousemove', (e) => {
+  if ((!state.dragKey && !state.resizeKey) || !state.templateImage) return;
+  const p = getCanvasClientRatio(e);
+
   if (state.dragKey) {
     const b = state.boxes[state.dragKey];
-    b.offsetX = p.x - b.x;
-    b.offsetY = p.y - b.y;
+    b.x = clamp(p.x - b.offsetX, 0, 1 - b.w);
+    b.y = clamp(p.y - b.offsetY, 0, 1 - b.h);
   }
-});
-window.addEventListener('mouseup', () => { state.dragKey = null; });
-window.addEventListener('mousemove', (e) => {
-  if (!state.dragKey || !state.templateImage) return;
-  const p = getCanvasClientRatio(e);
-  const b = state.boxes[state.dragKey];
-  b.x = clamp(p.x - b.offsetX, 0, 1 - b.w);
-  b.y = clamp(p.y - b.offsetY, 0, 1 - b.h);
+  if (state.resizeKey) {
+    const b = state.boxes[state.resizeKey];
+    b.w = clamp(p.x - b.x, 0.01, 1 - b.x);
+    b.h = clamp(p.y - b.y, 0.01, 1 - b.y);
+  }
+  syncBoxForm();
   drawTemplate();
 });
 window.addEventListener('resize', drawTemplate);
+el.activeBoxSelect.addEventListener('change', () => { syncBoxForm(); drawTemplate(); });
+el.applyBoxBtn.addEventListener('click', applyBoxForm);
 
 async function fileToImage(file) {
   return new Promise((resolve, reject) => {
@@ -146,7 +211,7 @@ el.templateInput.addEventListener('change', async (e) => {
   state.templateFileName = file.name;
   el.templatePreview.src = img.src;
   requestAnimationFrame(drawTemplate);
-  log(`Template dimuat: ${file.name}. Preview sudah tampil dan sensor siap digeser.`);
+  log(`Template dimuat: ${file.name}. Anda bisa geser dan resize setiap kotak sensor.`);
 });
 
 el.scanInput.addEventListener('change', async (e) => {
@@ -229,14 +294,16 @@ function detectOrientation(gray) {
 function extractNo(gray) {
   const r = roi(gray, state.boxes.noPeserta);
   const rs = new cv.Mat();
-  cv.resize(r, rs, new cv.Size(240, 70));
+  cv.resize(r, rs, new cv.Size(300, 70));
   const bw = new cv.Mat();
   cv.threshold(rs, bw, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU);
   const out = [];
-  for (let i = 0; i < 12; i += 1) {
-    const x = i * 20;
-    if (x + 20 > bw.cols) break;
-    const cell = bw.roi(new cv.Rect(x, 0, 20, bw.rows));
+  const digits = Math.max(4, parseInt(el.noDigitCount.value, 10) || 12);
+  const cellW = Math.floor(bw.cols / digits);
+  for (let i = 0; i < digits; i += 1) {
+    const x = i * cellW;
+    if (x + cellW > bw.cols) break;
+    const cell = bw.roi(new cv.Rect(x, 0, Math.min(cellW, bw.cols - x), bw.rows));
     const ink = cv.countNonZero(cell);
     if (ink > 80) out.push(String(i % 10));
     cell.delete();
@@ -247,27 +314,49 @@ function extractNo(gray) {
 
 function detectAnswers(gray) {
   const count = Math.max(1, parseInt(el.questionCount.value, 10) || 40);
-  const letters = ['A', 'B', 'C', 'D', 'E'];
+  const optCount = Math.max(2, parseInt(el.optionCount.value, 10) || 5);
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.slice(0, optCount).split('');
+  const direction = el.optionDirection.value;
+
   const r = roi(gray, state.boxes.answers);
   const bw = new cv.Mat();
   cv.threshold(r, bw, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU);
-
   const answers = [];
-  const qH = Math.floor(bw.rows / count);
-  for (let q = 0; q < count; q += 1) {
-    const y = q * qH;
-    if (y + qH > bw.rows) break;
-    let bestIdx = 0, bestInk = -1;
-    for (let o = 0; o < 5; o += 1) {
-      const x = Math.floor((o / 5) * bw.cols);
-      const w = Math.floor(bw.cols / 5);
-      const cell = bw.roi(new cv.Rect(x, y, Math.min(w, bw.cols - x), qH));
-      const ink = cv.countNonZero(cell);
-      if (ink > bestInk) { bestInk = ink; bestIdx = o; }
-      cell.delete();
+
+  if (direction === 'horizontal') {
+    const qH = Math.floor(bw.rows / count);
+    for (let q = 0; q < count; q += 1) {
+      const y = q * qH;
+      if (y + qH > bw.rows) break;
+      let bestIdx = 0, bestInk = -1;
+      for (let o = 0; o < optCount; o += 1) {
+        const x = Math.floor((o / optCount) * bw.cols);
+        const w = Math.floor(bw.cols / optCount);
+        const cell = bw.roi(new cv.Rect(x, y, Math.min(w, bw.cols - x), qH));
+        const ink = cv.countNonZero(cell);
+        if (ink > bestInk) { bestInk = ink; bestIdx = o; }
+        cell.delete();
+      }
+      answers.push(letters[bestIdx]);
     }
-    answers.push(letters[bestIdx]);
+  } else {
+    const qW = Math.floor(bw.cols / count);
+    for (let q = 0; q < count; q += 1) {
+      const x = q * qW;
+      if (x + qW > bw.cols) break;
+      let bestIdx = 0, bestInk = -1;
+      for (let o = 0; o < optCount; o += 1) {
+        const y = Math.floor((o / optCount) * bw.rows);
+        const h = Math.floor(bw.rows / optCount);
+        const cell = bw.roi(new cv.Rect(x, y, qW, Math.min(h, bw.rows - y)));
+        const ink = cv.countNonZero(cell);
+        if (ink > bestInk) { bestInk = ink; bestIdx = o; }
+        cell.delete();
+      }
+      answers.push(letters[bestIdx]);
+    }
   }
+
   r.delete(); bw.delete();
   return answers.join('');
 }
@@ -344,13 +433,16 @@ el.downloadBtn.addEventListener('click', () => {
 
 el.downloadBackupBtn.addEventListener('click', () => {
   const backup = {
-    version: 1,
+    version: 2,
     exported_at: new Date().toISOString(),
     template_file: state.templateFileName,
     boxes: state.boxes,
     db_csv: el.dbInput.value,
     answer_key: el.answerKey.value,
     question_count: el.questionCount.value,
+    no_digit_count: el.noDigitCount.value,
+    option_count: el.optionCount.value,
+    option_direction: el.optionDirection.value,
     results: state.results,
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
@@ -366,8 +458,7 @@ el.importBackupInput.addEventListener('change', async (e) => {
   const f = e.target.files?.[0];
   if (!f) return;
   try {
-    const raw = await f.text();
-    const data = JSON.parse(raw);
+    const data = JSON.parse(await f.text());
     if (data.boxes) {
       Object.keys(state.boxes).forEach((k) => {
         if (data.boxes[k]) state.boxes[k] = { ...state.boxes[k], ...data.boxes[k] };
@@ -381,11 +472,15 @@ el.importBackupInput.addEventListener('change', async (e) => {
     }
     if (typeof data.answer_key === 'string') el.answerKey.value = data.answer_key;
     if (data.question_count) el.questionCount.value = data.question_count;
+    if (data.no_digit_count) el.noDigitCount.value = data.no_digit_count;
+    if (data.option_count) el.optionCount.value = data.option_count;
+    if (data.option_direction) el.optionDirection.value = data.option_direction;
     if (Array.isArray(data.results)) {
       state.results = data.results;
       renderResults();
       el.downloadBtn.disabled = state.results.length === 0;
     }
+    syncBoxForm();
     if (state.templateImage) drawTemplate();
     log('Backup berhasil di-import. Lanjutkan pengerjaan Anda.');
   } catch (err) {
@@ -399,4 +494,6 @@ el.importBackupInput.addEventListener('change', async (e) => {
     log('OpenCV siap.');
   } else setTimeout(waitCv, 250);
 })();
+
+initBoxControls();
 log('Aplikasi siap. Upload template untuk mulai konfigurasi sensor.');

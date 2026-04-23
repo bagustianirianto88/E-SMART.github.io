@@ -10,6 +10,8 @@ Web statis untuk GitHub Pages yang mendukung proses scanning LJK Evalbee untuk k
   - **Atas: 3 kotak**
   - **Bawah: 2 kotak**
 - Area **nomor peserta** dan **jawaban** bisa digeser manual.
+- Ukuran kotak sensor bisa diubah (drag handle pojok kanan bawah atau input manual X/Y/W/H).
+- Setting pembacaan **No Peserta** (jumlah digit) dan **opsi jawaban** (jumlah opsi + arah horizontal/vertical) bisa disesuaikan sesuai LJK.
 - Sumber scan:
   - Upload batch gambar.
   - Hardware paper feeder via **bridge lokal HTTP** (contoh endpoint default `http://localhost:17777/api/next-scan`).

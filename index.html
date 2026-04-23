@@ -37,6 +37,41 @@
           <p class="hint">Kotak hijau: nomor peserta. Kotak ungu: grid jawaban untuk auto nilai.</p>
         </div>
       </div>
+
+      <div class="grid2">
+        <div>
+          <h3>Kontrol Ukuran/Posisi Kotak</h3>
+          <div class="row">
+            <label>Kotak aktif
+              <select id="activeBoxSelect"></select>
+            </label>
+            <label>X <input id="boxX" type="number" min="0" max="1" step="0.001" /></label>
+            <label>Y <input id="boxY" type="number" min="0" max="1" step="0.001" /></label>
+            <label>W <input id="boxW" type="number" min="0.01" max="1" step="0.001" /></label>
+            <label>H <input id="boxH" type="number" min="0.01" max="1" step="0.001" /></label>
+            <button id="applyBoxBtn" type="button">Apply Box</button>
+          </div>
+          <p class="hint">Kotak bisa digeser dan di-resize (tarik handle pojok kanan bawah), atau input manual X/Y/W/H.</p>
+        </div>
+        <div>
+          <h3>Setting Pembacaan NO & Opsi</h3>
+          <div class="row">
+            <label>Digit No Peserta
+              <input id="noDigitCount" type="number" min="4" max="20" value="12" />
+            </label>
+            <label>Pilihan per soal
+              <input id="optionCount" type="number" min="2" max="10" value="5" />
+            </label>
+            <label>Arah opsi
+              <select id="optionDirection">
+                <option value="horizontal">Horizontal (A..E ke samping)</option>
+                <option value="vertical">Vertical (A..E ke bawah)</option>
+              </select>
+            </label>
+          </div>
+          <p class="hint">Setting ini membantu menentukan posisi pembacaan nomor peserta dan opsi jawaban agar pas dengan template LJK.</p>
+        </div>
+      </div>
     </section>
 
     <section class="panel">

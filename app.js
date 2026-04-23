@@ -8,64 +8,58 @@ const state = {
   stream: null,
   dragKey: null,
   resizeKey: null,
+  zoom: 1,
   boxes: {
-    noPeserta: { x: 0.08, y: 0.14, w: 0.26, h: 0.11, color: '#22c55e', label: 'NO' },
-    answers: { x: 0.42, y: 0.18, w: 0.5, h: 0.72, color: '#a855f7', label: 'ANS' },
-    top1: { x: 0.06, y: 0.03, w: 0.08, h: 0.04, color: '#38bdf8', label: 'TOP1' },
-    top2: { x: 0.46, y: 0.03, w: 0.08, h: 0.04, color: '#38bdf8', label: 'TOP2' },
-    top3: { x: 0.86, y: 0.03, w: 0.08, h: 0.04, color: '#38bdf8', label: 'TOP3' },
-    bot1: { x: 0.24, y: 0.93, w: 0.08, h: 0.04, color: '#fb923c', label: 'BOT1' },
-    bot2: { x: 0.68, y: 0.93, w: 0.08, h: 0.04, color: '#fb923c', label: 'BOT2' },
+    noPeserta: { x: 0.07, y: 0.12, w: 0.24, h: 0.2, color: '#22c55e', label: 'NO' },
+    top1: { x: 0.08, y: 0.03, w: 0.06, h: 0.035, color: '#38bdf8', label: 'TOP1' },
+    top2: { x: 0.46, y: 0.03, w: 0.06, h: 0.035, color: '#38bdf8', label: 'TOP2' },
+    top3: { x: 0.84, y: 0.03, w: 0.06, h: 0.035, color: '#38bdf8', label: 'TOP3' },
+    bot1: { x: 0.24, y: 0.93, w: 0.06, h: 0.035, color: '#fb923c', label: 'BOT1' },
+    bot2: { x: 0.68, y: 0.93, w: 0.06, h: 0.035, color: '#fb923c', label: 'BOT2' },
+    ans1: { x: 0.36, y: 0.17, w: 0.24, h: 0.33, color: '#a855f7', label: 'ANS1' },
+    ans2: { x: 0.62, y: 0.17, w: 0.24, h: 0.33, color: '#c026d3', label: 'ANS2' },
+    ans3: { x: 0.36, y: 0.54, w: 0.24, h: 0.33, color: '#7c3aed', label: 'ANS3' },
   },
+  answerAreas: [
+    { id: 'ans1', active: true, start: 1, end: 20 },
+    { id: 'ans2', active: true, start: 21, end: 40 },
+    { id: 'ans3', active: false, start: 41, end: 60 },
+  ],
 };
 
 const el = {
   templateInput: document.getElementById('templateInput'),
+  zoomRange: document.getElementById('zoomRange'),
   templatePreview: document.getElementById('templatePreview'),
   templateCanvas: document.getElementById('templateCanvas'),
   activeBoxSelect: document.getElementById('activeBoxSelect'),
-  boxX: document.getElementById('boxX'),
-  boxY: document.getElementById('boxY'),
-  boxW: document.getElementById('boxW'),
-  boxH: document.getElementById('boxH'),
+  boxX: document.getElementById('boxX'), boxY: document.getElementById('boxY'), boxW: document.getElementById('boxW'), boxH: document.getElementById('boxH'),
   applyBoxBtn: document.getElementById('applyBoxBtn'),
   noDigitCount: document.getElementById('noDigitCount'),
-  optionCount: document.getElementById('optionCount'),
-  optionDirection: document.getElementById('optionDirection'),
-  scanInput: document.getElementById('scanInput'),
-  feederUrl: document.getElementById('feederUrl'),
-  pullFeederBtn: document.getElementById('pullFeederBtn'),
-  video: document.getElementById('video'),
-  startCameraBtn: document.getElementById('startCameraBtn'),
-  captureBtn: document.getElementById('captureBtn'),
-  stopCameraBtn: document.getElementById('stopCameraBtn'),
-  dbInput: document.getElementById('dbInput'),
-  loadDbBtn: document.getElementById('loadDbBtn'),
-  dbStatus: document.getElementById('dbStatus'),
-  dbTableBody: document.querySelector('#dbTable tbody'),
-  answerKey: document.getElementById('answerKey'),
+  noDirection: document.getElementById('noDirection'),
   questionCount: document.getElementById('questionCount'),
-  downloadBackupBtn: document.getElementById('downloadBackupBtn'),
-  importBackupInput: document.getElementById('importBackupInput'),
-  processBtn: document.getElementById('processBtn'),
-  downloadBtn: document.getElementById('downloadBtn'),
-  resultBody: document.querySelector('#resultTable tbody'),
+  optionCount: document.getElementById('optionCount'),
+  answerAreaCount: document.getElementById('answerAreaCount'),
+  applyAreaCountBtn: document.getElementById('applyAreaCountBtn'),
+  areaConfigTableBody: document.querySelector('#areaConfigTable tbody'),
+  scanInput: document.getElementById('scanInput'), feederUrl: document.getElementById('feederUrl'), pullFeederBtn: document.getElementById('pullFeederBtn'),
+  video: document.getElementById('video'), startCameraBtn: document.getElementById('startCameraBtn'), captureBtn: document.getElementById('captureBtn'), stopCameraBtn: document.getElementById('stopCameraBtn'),
+  dbInput: document.getElementById('dbInput'), loadDbBtn: document.getElementById('loadDbBtn'), dbStatus: document.getElementById('dbStatus'), dbTableBody: document.querySelector('#dbTable tbody'),
+  answerKey: document.getElementById('answerKey'),
+  downloadBackupBtn: document.getElementById('downloadBackupBtn'), importBackupInput: document.getElementById('importBackupInput'),
+  processBtn: document.getElementById('processBtn'), downloadBtn: document.getElementById('downloadBtn'), resultBody: document.querySelector('#resultTable tbody'),
   log: document.getElementById('log'),
 };
 const tctx = el.templateCanvas.getContext('2d');
+const clamp = (v, mi = 0, ma = 1) => Math.max(mi, Math.min(ma, v));
+const log = (m) => { el.log.textContent += `[${new Date().toLocaleTimeString('id-ID')}] ${m}\n`; el.log.scrollTop = el.log.scrollHeight; };
 
-const clamp = (v, min = 0, max = 1) => Math.max(min, Math.min(max, v));
-const log = (m) => {
-  el.log.textContent += `[${new Date().toLocaleTimeString('id-ID')}] ${m}\n`;
-  el.log.scrollTop = el.log.scrollHeight;
-};
-
-function initBoxControls() {
+function initBoxOptions() {
+  el.activeBoxSelect.innerHTML = '';
   Object.keys(state.boxes).forEach((k) => {
-    const opt = document.createElement('option');
-    opt.value = k;
-    opt.textContent = `${k} (${state.boxes[k].label})`;
-    el.activeBoxSelect.appendChild(opt);
+    const o = document.createElement('option');
+    o.value = k; o.textContent = `${k} (${state.boxes[k].label})`;
+    el.activeBoxSelect.appendChild(o);
   });
   el.activeBoxSelect.value = 'noPeserta';
   syncBoxForm();
@@ -73,14 +67,10 @@ function initBoxControls() {
 function syncBoxForm() {
   const b = state.boxes[el.activeBoxSelect.value];
   if (!b) return;
-  el.boxX.value = b.x.toFixed(3);
-  el.boxY.value = b.y.toFixed(3);
-  el.boxW.value = b.w.toFixed(3);
-  el.boxH.value = b.h.toFixed(3);
+  el.boxX.value = b.x.toFixed(3); el.boxY.value = b.y.toFixed(3); el.boxW.value = b.w.toFixed(3); el.boxH.value = b.h.toFixed(3);
 }
 function applyBoxForm() {
-  const key = el.activeBoxSelect.value;
-  const b = state.boxes[key];
+  const b = state.boxes[el.activeBoxSelect.value];
   if (!b) return;
   b.x = clamp(parseFloat(el.boxX.value) || b.x, 0, 0.98);
   b.y = clamp(parseFloat(el.boxY.value) || b.y, 0, 0.98);
@@ -89,98 +79,111 @@ function applyBoxForm() {
   drawTemplate();
 }
 
-function parseDb(raw) {
-  const map = new Map();
-  raw.split(/\r?\n/).forEach((line) => {
-    const [nomor, nama = '', kelas = '', ruang = '', mapel = ''] = line.split(',').map(v => v.trim());
-    if (nomor && /^\d+$/.test(nomor)) map.set(nomor, { nomor, nama, kelas, ruang, mapel });
-  });
-  return map;
-}
-function renderDb() {
-  el.dbTableBody.innerHTML = '';
-  [...state.db.values()].forEach((siswa) => {
+function renderAreaConfig() {
+  el.areaConfigTableBody.innerHTML = '';
+  state.answerAreas.forEach((a, i) => {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${siswa.nomor}</td><td>${siswa.nama}</td><td>${siswa.kelas}</td><td>${siswa.ruang}</td><td>${siswa.mapel}</td>`;
-    el.dbTableBody.appendChild(tr);
+    tr.innerHTML = `<td>Area ${i + 1}</td>
+      <td><input type="checkbox" data-k="active" data-i="${i}" ${a.active ? 'checked' : ''}></td>
+      <td><input type="number" data-k="start" data-i="${i}" min="1" value="${a.start}"></td>
+      <td><input type="number" data-k="end" data-i="${i}" min="1" value="${a.end}"></td>
+      <td>${a.id}</td>`;
+    el.areaConfigTableBody.appendChild(tr);
   });
 }
-
-function getCanvasClientRatio(evt) {
-  const r = el.templateCanvas.getBoundingClientRect();
-  return { x: (evt.clientX - r.left) / r.width, y: (evt.clientY - r.top) / r.height };
-}
+el.areaConfigTableBody.addEventListener('change', (e) => {
+  const i = Number(e.target.dataset.i);
+  const k = e.target.dataset.k;
+  if (Number.isNaN(i) || !k) return;
+  state.answerAreas[i][k] = k === 'active' ? e.target.checked : parseInt(e.target.value, 10);
+  drawTemplate();
+});
+el.applyAreaCountBtn.addEventListener('click', () => {
+  const count = clamp(parseInt(el.answerAreaCount.value, 10) || 2, 1, 3);
+  state.answerAreas.forEach((a, i) => { a.active = i < count; });
+  renderAreaConfig();
+  drawTemplate();
+});
 
 function drawTemplate() {
   if (!state.templateImage) return;
   const img = state.templateImage;
-  const cssWidth = el.templatePreview.clientWidth || img.width;
-  const cssHeight = img.height * (cssWidth / img.width);
+  const cssWidth = img.width * state.zoom;
+  const cssHeight = img.height * state.zoom;
 
+  el.templatePreview.style.width = `${cssWidth}px`;
+  el.templatePreview.style.height = `${cssHeight}px`;
   el.templateCanvas.width = img.width;
   el.templateCanvas.height = img.height;
   el.templateCanvas.style.width = `${cssWidth}px`;
   el.templateCanvas.style.height = `${cssHeight}px`;
 
   tctx.clearRect(0, 0, img.width, img.height);
-  Object.entries(state.boxes).forEach(([key, b]) => {
+  Object.entries(state.boxes).forEach(([k, b]) => {
     const x = b.x * img.width, y = b.y * img.height, w = b.w * img.width, h = b.h * img.height;
-    tctx.strokeStyle = b.color;
-    tctx.lineWidth = key === el.activeBoxSelect.value ? 4 : 2;
+    tctx.strokeStyle = b.color; tctx.lineWidth = k === el.activeBoxSelect.value ? 4 : 2;
     tctx.strokeRect(x, y, w, h);
-    tctx.fillStyle = b.color;
-    tctx.fillRect(x, Math.max(0, y - 18), 60, 18);
-    tctx.fillStyle = '#fff';
-    tctx.font = '12px sans-serif';
-    tctx.fillText(b.label, x + 6, y - 5 < 10 ? 12 : y - 5);
-    // resize handle
-    tctx.fillStyle = '#f8fafc';
-    tctx.strokeStyle = b.color;
-    tctx.fillRect(x + w - 8, y + h - 8, 12, 12);
-    tctx.strokeRect(x + w - 8, y + h - 8, 12, 12);
+    tctx.fillStyle = b.color; tctx.fillRect(x, Math.max(0, y - 18), 62, 18);
+    tctx.fillStyle = '#fff'; tctx.font = '12px sans-serif'; tctx.fillText(b.label, x + 6, y - 5 < 10 ? 12 : y - 5);
+    tctx.fillStyle = '#fff'; tctx.fillRect(x + w - 8, y + h - 8, 12, 12); tctx.strokeRect(x + w - 8, y + h - 8, 12, 12);
+  });
+
+  // grid patokan interaktif untuk area soal
+  const totalOpt = Math.max(2, parseInt(el.optionCount.value, 10) || 4);
+  state.answerAreas.filter(a => a.active).forEach((area) => {
+    const b = state.boxes[area.id];
+    if (!b) return;
+    const qCount = Math.max(1, area.end - area.start + 1);
+    const x = b.x * img.width, y = b.y * img.height, w = b.w * img.width, h = b.h * img.height;
+    tctx.strokeStyle = 'rgba(255,255,255,.45)';
+    tctx.lineWidth = 1;
+    for (let qi = 1; qi < qCount; qi += 1) {
+      const yy = y + (qi * h / qCount);
+      tctx.beginPath(); tctx.moveTo(x, yy); tctx.lineTo(x + w, yy); tctx.stroke();
+    }
+    for (let oi = 1; oi < totalOpt; oi += 1) {
+      const xx = x + (oi * w / totalOpt);
+      tctx.beginPath(); tctx.moveTo(xx, y); tctx.lineTo(xx, y + h); tctx.stroke();
+    }
   });
 }
 
-function hitTest(pos) {
+function getPos(evt) {
+  const r = el.templateCanvas.getBoundingClientRect();
+  return { x: (evt.clientX - r.left) / r.width, y: (evt.clientY - r.top) / r.height };
+}
+function hitBox(p) {
   for (const [k, b] of Object.entries(state.boxes)) {
-    if (pos.x >= b.x && pos.x <= b.x + b.w && pos.y >= b.y && pos.y <= b.y + b.h) return k;
+    if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) return k;
   }
   return null;
 }
-function resizeHandleHit(pos, key) {
+function nearResizeHandle(p, key) {
   const b = state.boxes[key];
-  const pad = 0.02;
-  return pos.x >= b.x + b.w - pad && pos.x <= b.x + b.w + pad && pos.y >= b.y + b.h - pad && pos.y <= b.y + b.h + pad;
+  return p.x > b.x + b.w - 0.02 && p.y > b.y + b.h - 0.02;
 }
 
 el.templateCanvas.addEventListener('mousedown', (e) => {
   if (!state.templateImage) return;
-  const p = getCanvasClientRatio(e);
-  const key = hitTest(p);
+  const p = getPos(e);
+  const key = hitBox(p);
   if (!key) return;
   el.activeBoxSelect.value = key;
   syncBoxForm();
-  if (resizeHandleHit(p, key)) {
-    state.resizeKey = key;
-    return;
+  if (nearResizeHandle(p, key)) state.resizeKey = key;
+  else {
+    state.dragKey = key;
+    const b = state.boxes[key]; b.offX = p.x - b.x; b.offY = p.y - b.y;
   }
-  state.dragKey = key;
-  const b = state.boxes[key];
-  b.offsetX = p.x - b.x;
-  b.offsetY = p.y - b.y;
 });
-window.addEventListener('mouseup', () => {
-  state.dragKey = null;
-  state.resizeKey = null;
-});
+window.addEventListener('mouseup', () => { state.dragKey = null; state.resizeKey = null; });
 window.addEventListener('mousemove', (e) => {
   if ((!state.dragKey && !state.resizeKey) || !state.templateImage) return;
-  const p = getCanvasClientRatio(e);
-
+  const p = getPos(e);
   if (state.dragKey) {
     const b = state.boxes[state.dragKey];
-    b.x = clamp(p.x - b.offsetX, 0, 1 - b.w);
-    b.y = clamp(p.y - b.offsetY, 0, 1 - b.h);
+    b.x = clamp(p.x - b.offX, 0, 1 - b.w);
+    b.y = clamp(p.y - b.offY, 0, 1 - b.h);
   }
   if (state.resizeKey) {
     const b = state.boxes[state.resizeKey];
@@ -190,175 +193,129 @@ window.addEventListener('mousemove', (e) => {
   syncBoxForm();
   drawTemplate();
 });
-window.addEventListener('resize', drawTemplate);
 el.activeBoxSelect.addEventListener('change', () => { syncBoxForm(); drawTemplate(); });
 el.applyBoxBtn.addEventListener('click', applyBoxForm);
+el.zoomRange.addEventListener('input', () => {
+  state.zoom = (parseInt(el.zoomRange.value, 10) || 100) / 100;
+  drawTemplate();
+});
 
-async function fileToImage(file) {
-  return new Promise((resolve, reject) => {
-    const i = new Image();
-    i.onload = () => resolve(i);
-    i.onerror = reject;
-    i.src = URL.createObjectURL(file);
+function parseDb(raw) {
+  const m = new Map();
+  raw.split(/\r?\n/).forEach((line) => {
+    const [nomor, nama = '', kelas = '', ruang = '', mapel = ''] = line.split(',').map(v => v.trim());
+    if (nomor && /^\d+$/.test(nomor)) m.set(nomor, { nomor, nama, kelas, ruang, mapel });
+  });
+  return m;
+}
+function renderDb() {
+  el.dbTableBody.innerHTML = '';
+  [...state.db.values()].forEach((s) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${s.nomor}</td><td>${s.nama}</td><td>${s.kelas}</td><td>${s.ruang}</td><td>${s.mapel}</td>`;
+    el.dbTableBody.appendChild(tr);
   });
 }
 
-el.templateInput.addEventListener('change', async (e) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
-  const img = await fileToImage(file);
-  state.templateImage = img;
-  state.templateFileName = file.name;
-  el.templatePreview.src = img.src;
-  requestAnimationFrame(drawTemplate);
-  log(`Template dimuat: ${file.name}. Anda bisa geser dan resize setiap kotak sensor.`);
-});
-
-el.scanInput.addEventListener('change', async (e) => {
-  for (const f of [...e.target.files]) {
-    const img = await fileToImage(f);
-    const c = document.createElement('canvas');
-    c.width = img.width; c.height = img.height;
-    c.getContext('2d').drawImage(img, 0, 0);
-    state.queue.push({ name: f.name, canvas: c });
+function meanCircleInk(mat, x, y, r) {
+  let sum = 0, n = 0;
+  const x0 = Math.max(0, Math.floor(x - r)), x1 = Math.min(mat.cols - 1, Math.ceil(x + r));
+  const y0 = Math.max(0, Math.floor(y - r)), y1 = Math.min(mat.rows - 1, Math.ceil(y + r));
+  for (let yy = y0; yy <= y1; yy += 1) {
+    for (let xx = x0; xx <= x1; xx += 1) {
+      const dx = xx - x, dy = yy - y;
+      if (dx * dx + dy * dy <= r * r) {
+        sum += mat.ucharPtr(yy, xx)[0];
+        n += 1;
+      }
+    }
   }
-  log(`Antrean scan bertambah. Total: ${state.queue.length}.`);
-});
-
-el.pullFeederBtn.addEventListener('click', async () => {
-  try {
-    const res = await fetch(el.feederUrl.value.trim());
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const blob = await res.blob();
-    const file = new File([blob], `feeder-${Date.now()}.png`, { type: blob.type || 'image/png' });
-    const img = await fileToImage(file);
-    const c = document.createElement('canvas');
-    c.width = img.width; c.height = img.height;
-    c.getContext('2d').drawImage(img, 0, 0);
-    state.queue.push({ name: file.name, canvas: c });
-    log('Berhasil ambil 1 lembar dari feeder hardware bridge.');
-  } catch (err) {
-    log(`Gagal feeder hardware: ${err.message}. Gunakan kamera fallback jika perlu.`);
-  }
-});
-
-el.startCameraBtn.addEventListener('click', async () => {
-  try {
-    state.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-    el.video.srcObject = state.stream;
-    el.captureBtn.disabled = false;
-    el.stopCameraBtn.disabled = false;
-    log('Kamera fallback aktif.');
-  } catch (err) { log(`Tidak bisa akses kamera: ${err.message}`); }
-});
-el.stopCameraBtn.addEventListener('click', () => {
-  if (!state.stream) return;
-  state.stream.getTracks().forEach(t => t.stop());
-  state.stream = null;
-  el.captureBtn.disabled = true;
-  el.stopCameraBtn.disabled = true;
-  log('Kamera fallback berhenti.');
-});
-el.captureBtn.addEventListener('click', () => {
-  const c = document.createElement('canvas');
-  c.width = el.video.videoWidth; c.height = el.video.videoHeight;
-  c.getContext('2d').drawImage(el.video, 0, 0);
-  state.queue.push({ name: `camera-${Date.now()}.png`, canvas: c });
-  log('Capture kamera masuk antrean.');
-});
-
-el.loadDbBtn.addEventListener('click', () => {
-  state.db = parseDb(el.dbInput.value);
-  renderDb();
-  el.dbStatus.textContent = `Database termuat: ${state.db.size} peserta.`;
-  log(`Database aktif ${state.db.size} peserta.`);
-});
+  const mean = n ? sum / n : 255;
+  return 255 - mean;
+}
 
 function roi(gray, box) {
   const x = Math.floor(gray.cols * box.x), y = Math.floor(gray.rows * box.y);
   const w = Math.max(1, Math.floor(gray.cols * box.w)), h = Math.max(1, Math.floor(gray.rows * box.h));
   return gray.roi(new cv.Rect(x, y, Math.min(w, gray.cols - x), Math.min(h, gray.rows - y)));
 }
-function darkness(mat) { return 255 - cv.mean(mat)[0]; }
 function detectOrientation(gray) {
-  const topSum = ['top1', 'top2', 'top3'].reduce((s, k) => { const r = roi(gray, state.boxes[k]); const v = darkness(r); r.delete(); return s + v; }, 0);
-  const botSum = ['bot1', 'bot2'].reduce((s, k) => { const r = roi(gray, state.boxes[k]); const v = darkness(r); r.delete(); return s + v; }, 0);
-  if (botSum > topSum * 0.9) {
-    const rotated = new cv.Mat();
-    cv.rotate(gray, rotated, cv.ROTATE_180);
-    return { gray: rotated, orientation: 'rotated 180 (deteksi 3 atas vs 2 bawah)' };
-  }
-  return { gray: gray.clone(), orientation: 'normal (deteksi 3 atas vs 2 bawah)' };
+  const ds = (k) => { const r = roi(gray, state.boxes[k]); const v = 255 - cv.mean(r)[0]; r.delete(); return v; };
+  const top = ds('top1') + ds('top2') + ds('top3');
+  const bot = ds('bot1') + ds('bot2');
+  if (bot > top * 0.9) { const rt = new cv.Mat(); cv.rotate(gray, rt, cv.ROTATE_180); return { gray: rt, orientation: 'rotated 180' }; }
+  return { gray: gray.clone(), orientation: 'normal' };
 }
 
 function extractNo(gray) {
-  const r = roi(gray, state.boxes.noPeserta);
-  const rs = new cv.Mat();
-  cv.resize(r, rs, new cv.Size(300, 70));
+  const digits = Math.max(4, parseInt(el.noDigitCount.value, 10) || 10);
+  const box = roi(gray, state.boxes.noPeserta);
   const bw = new cv.Mat();
-  cv.threshold(rs, bw, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU);
-  const out = [];
-  const digits = Math.max(4, parseInt(el.noDigitCount.value, 10) || 12);
-  const cellW = Math.floor(bw.cols / digits);
-  for (let i = 0; i < digits; i += 1) {
-    const x = i * cellW;
-    if (x + cellW > bw.cols) break;
-    const cell = bw.roi(new cv.Rect(x, 0, Math.min(cellW, bw.cols - x), bw.rows));
-    const ink = cv.countNonZero(cell);
-    if (ink > 80) out.push(String(i % 10));
-    cell.delete();
+  cv.threshold(box, bw, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU);
+  const result = [];
+
+  if (el.noDirection.value === 'vertical') {
+    const colW = bw.cols / digits;
+    const rowH = bw.rows / 10;
+    for (let d = 0; d < digits; d += 1) {
+      let best = 0, bestInk = -1;
+      for (let r = 0; r < 10; r += 1) {
+        const cx = (d + 0.5) * colW;
+        const cy = (r + 0.5) * rowH;
+        const ink = meanCircleInk(bw, cx, cy, Math.min(colW, rowH) * 0.32);
+        if (ink > bestInk) { bestInk = ink; best = r; }
+      }
+      result.push(String(best));
+    }
+  } else {
+    const rowH = bw.rows / digits;
+    const colW = bw.cols / 10;
+    for (let d = 0; d < digits; d += 1) {
+      let best = 0, bestInk = -1;
+      for (let c = 0; c < 10; c += 1) {
+        const cx = (c + 0.5) * colW;
+        const cy = (d + 0.5) * rowH;
+        const ink = meanCircleInk(bw, cx, cy, Math.min(colW, rowH) * 0.32);
+        if (ink > bestInk) { bestInk = ink; best = c; }
+      }
+      result.push(String(best));
+    }
   }
-  r.delete(); rs.delete(); bw.delete();
-  return out.join('') || 'UNKNOWN';
+
+  box.delete(); bw.delete();
+  return result.join('');
 }
 
 function detectAnswers(gray) {
-  const count = Math.max(1, parseInt(el.questionCount.value, 10) || 40);
-  const optCount = Math.max(2, parseInt(el.optionCount.value, 10) || 5);
-  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.slice(0, optCount).split('');
-  const direction = el.optionDirection.value;
+  const totalQ = Math.max(1, parseInt(el.questionCount.value, 10) || 40);
+  const opt = Math.max(2, parseInt(el.optionCount.value, 10) || 4);
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.slice(0, opt).split('');
+  const answers = Array(totalQ).fill('');
 
-  const r = roi(gray, state.boxes.answers);
-  const bw = new cv.Mat();
-  cv.threshold(r, bw, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU);
-  const answers = [];
+  state.answerAreas.filter(a => a.active).forEach((area) => {
+    const start = clamp(area.start, 1, totalQ);
+    const end = clamp(area.end, start, totalQ);
+    const qCount = end - start + 1;
+    const b = roi(gray, state.boxes[area.id]);
+    const bw = new cv.Mat();
+    cv.threshold(b, bw, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU);
 
-  if (direction === 'horizontal') {
-    const qH = Math.floor(bw.rows / count);
-    for (let q = 0; q < count; q += 1) {
-      const y = q * qH;
-      if (y + qH > bw.rows) break;
-      let bestIdx = 0, bestInk = -1;
-      for (let o = 0; o < optCount; o += 1) {
-        const x = Math.floor((o / optCount) * bw.cols);
-        const w = Math.floor(bw.cols / optCount);
-        const cell = bw.roi(new cv.Rect(x, y, Math.min(w, bw.cols - x), qH));
-        const ink = cv.countNonZero(cell);
-        if (ink > bestInk) { bestInk = ink; bestIdx = o; }
-        cell.delete();
+    const qH = bw.rows / qCount;
+    const oW = bw.cols / opt;
+    for (let qi = 0; qi < qCount; qi += 1) {
+      let best = 0, bestInk = -1;
+      for (let oi = 0; oi < opt; oi += 1) {
+        const cx = (oi + 0.5) * oW;
+        const cy = (qi + 0.5) * qH;
+        const ink = meanCircleInk(bw, cx, cy, Math.min(oW, qH) * 0.28);
+        if (ink > bestInk) { bestInk = ink; best = oi; }
       }
-      answers.push(letters[bestIdx]);
+      answers[start - 1 + qi] = letters[best];
     }
-  } else {
-    const qW = Math.floor(bw.cols / count);
-    for (let q = 0; q < count; q += 1) {
-      const x = q * qW;
-      if (x + qW > bw.cols) break;
-      let bestIdx = 0, bestInk = -1;
-      for (let o = 0; o < optCount; o += 1) {
-        const y = Math.floor((o / optCount) * bw.rows);
-        const h = Math.floor(bw.rows / optCount);
-        const cell = bw.roi(new cv.Rect(x, y, qW, Math.min(h, bw.rows - y)));
-        const ink = cv.countNonZero(cell);
-        if (ink > bestInk) { bestInk = ink; bestIdx = o; }
-        cell.delete();
-      }
-      answers.push(letters[bestIdx]);
-    }
-  }
+    b.delete(); bw.delete();
+  });
 
-  r.delete(); bw.delete();
-  return answers.join('');
+  return answers.map(a => a || '-').join('');
 }
 
 function scoreAnswers(ans) {
@@ -371,9 +328,9 @@ function scoreAnswers(ans) {
 
 function renderResults() {
   el.resultBody.innerHTML = '';
-  state.results.forEach(r => {
+  state.results.forEach((r) => {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${r.file}</td><td>${r.nomor}</td><td>${r.nama}</td><td>${r.kelas}</td><td>${r.ruang}</td><td>${r.mapel}</td><td>${r.jawaban}</td><td>${r.benar}</td><td>${r.nilai}</td><td>${r.orientasi}</td>`;
+    tr.innerHTML = `<td>${r.file}</td><td>${r.nomor}</td><td>${r.nama}</td><td>${r.kelas}</td><td>${r.jawaban}</td><td>${r.benar}</td><td>${r.nilai}</td><td>${r.orientasi}</td>`;
     el.resultBody.appendChild(tr);
   });
 }
@@ -385,115 +342,135 @@ async function processOne(item) {
   const oriented = detectOrientation(gray);
   const nomor = extractNo(oriented.gray);
   const jawaban = detectAnswers(oriented.gray);
-  const scored = scoreAnswers(jawaban);
-  const siswa = state.db.get(nomor) || { nama: 'Tidak ditemukan', kelas: '-', ruang: '-', mapel: '-' };
+  const sc = scoreAnswers(jawaban);
+  const siswa = state.db.get(nomor) || { nama: 'Tidak ditemukan', kelas: '-' };
   src.delete(); gray.delete(); oriented.gray.delete();
+  return { file: item.name, nomor, nama: siswa.nama, kelas: siswa.kelas, jawaban, benar: sc.benar, nilai: sc.nilai, orientasi: oriented.orientation };
+}
 
+function backupData() {
   return {
-    file: item.name,
-    nomor,
-    nama: siswa.nama,
-    kelas: siswa.kelas,
-    ruang: siswa.ruang,
-    mapel: siswa.mapel,
-    jawaban,
-    benar: scored.benar,
-    nilai: scored.nilai,
-    orientasi: oriented.orientation,
+    version: 3,
+    exported_at: new Date().toISOString(),
+    boxes: state.boxes,
+    answer_areas: state.answerAreas,
+    zoom: state.zoom,
+    db_csv: el.dbInput.value,
+    answer_key: el.answerKey.value,
+    no_digit_count: el.noDigitCount.value,
+    no_direction: el.noDirection.value,
+    question_count: el.questionCount.value,
+    option_count: el.optionCount.value,
+    results: state.results,
   };
 }
 
-el.processBtn.addEventListener('click', async () => {
-  if (!state.cvReady) return log('OpenCV belum siap.');
-  if (!state.templateImage) return log('Upload template dulu agar sensor bisa dipakai.');
-  if (!state.queue.length) return log('Tidak ada antrean scan.');
+el.templateInput.addEventListener('change', async (e) => {
+  const f = e.target.files?.[0]; if (!f) return;
+  const img = new Image();
+  img.onload = () => {
+    state.templateImage = img;
+    state.templateFileName = f.name;
+    el.templatePreview.src = img.src;
+    drawTemplate();
+    log(`Template ${f.name} dimuat.`);
+  };
+  img.src = URL.createObjectURL(f);
+});
+el.scanInput.addEventListener('change', async (e) => {
+  for (const f of [...e.target.files]) {
+    const i = new Image();
+    await new Promise((ok) => { i.onload = ok; i.src = URL.createObjectURL(f); });
+    const c = document.createElement('canvas'); c.width = i.width; c.height = i.height; c.getContext('2d').drawImage(i, 0, 0);
+    state.queue.push({ name: f.name, canvas: c });
+  }
+  log(`Antrean scan: ${state.queue.length}`);
+});
 
-  const jobs = [...state.queue];
-  state.queue = [];
-  log(`Mulai proses ${jobs.length} lembar.`);
-  for (const item of jobs) {
-    try {
-      const row = await processOne(item);
-      state.results.push(row);
-      log(`Selesai ${item.name}: ${row.nomor}, nilai ${row.nilai}`);
-    } catch (err) {
-      log(`Gagal ${item.name}: ${err.message}`);
-    }
+el.pullFeederBtn.addEventListener('click', async () => {
+  try {
+    const r = await fetch(el.feederUrl.value.trim());
+    const b = await r.blob();
+    const i = new Image();
+    await new Promise((ok) => { i.onload = ok; i.src = URL.createObjectURL(b); });
+    const c = document.createElement('canvas'); c.width = i.width; c.height = i.height; c.getContext('2d').drawImage(i, 0, 0);
+    state.queue.push({ name: `feeder-${Date.now()}.png`, canvas: c });
+    log('1 lembar ditarik dari feeder bridge.');
+  } catch (e) { log(`Gagal feeder: ${e.message}`); }
+});
+el.startCameraBtn.addEventListener('click', async () => {
+  try {
+    state.stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    el.video.srcObject = state.stream; el.captureBtn.disabled = false; el.stopCameraBtn.disabled = false;
+  } catch (e) { log(`Kamera gagal: ${e.message}`); }
+});
+el.stopCameraBtn.addEventListener('click', () => {
+  if (!state.stream) return;
+  state.stream.getTracks().forEach(t => t.stop());
+  state.stream = null; el.captureBtn.disabled = true; el.stopCameraBtn.disabled = true;
+});
+el.captureBtn.addEventListener('click', () => {
+  const c = document.createElement('canvas'); c.width = el.video.videoWidth; c.height = el.video.videoHeight;
+  c.getContext('2d').drawImage(el.video, 0, 0);
+  state.queue.push({ name: `cam-${Date.now()}.png`, canvas: c });
+  log('Capture kamera ditambahkan ke antrean.');
+});
+
+el.loadDbBtn.addEventListener('click', () => {
+  state.db = parseDb(el.dbInput.value);
+  renderDb();
+  el.dbStatus.textContent = `Database termuat: ${state.db.size}`;
+});
+
+el.processBtn.addEventListener('click', async () => {
+  if (!state.cvReady) return log('OpenCV belum siap');
+  if (!state.templateImage) return log('Upload template dulu');
+  if (!state.queue.length) return log('Antrean kosong');
+  const jobs = [...state.queue]; state.queue = [];
+  for (const job of jobs) {
+    try { state.results.push(await processOne(job)); }
+    catch (e) { log(`Error ${job.name}: ${e.message}`); }
   }
   renderResults();
-  el.downloadBtn.disabled = state.results.length === 0;
+  el.downloadBtn.disabled = !state.results.length;
+  log('Proses selesai.');
 });
 
 el.downloadBtn.addEventListener('click', () => {
   const ws = XLSX.utils.json_to_sheet(state.results);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Hasil SAS-STS');
-  XLSX.writeFile(wb, `hasil-sas-sts-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  XLSX.utils.book_append_sheet(wb, ws, 'Hasil OMR');
+  XLSX.writeFile(wb, `hasil-omr-${new Date().toISOString().slice(0, 10)}.xlsx`);
 });
 
 el.downloadBackupBtn.addEventListener('click', () => {
-  const backup = {
-    version: 2,
-    exported_at: new Date().toISOString(),
-    template_file: state.templateFileName,
-    boxes: state.boxes,
-    db_csv: el.dbInput.value,
-    answer_key: el.answerKey.value,
-    question_count: el.questionCount.value,
-    no_digit_count: el.noDigitCount.value,
-    option_count: el.optionCount.value,
-    option_direction: el.optionDirection.value,
-    results: state.results,
-  };
-  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `backup-sas-sts-${new Date().toISOString().slice(0, 10)}.json`;
-  a.click();
-  URL.revokeObjectURL(a.href);
-  log('Backup berhasil di-download.');
+  const blob = new Blob([JSON.stringify(backupData(), null, 2)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'backup-omr.json'; a.click(); URL.revokeObjectURL(a.href);
 });
-
 el.importBackupInput.addEventListener('change', async (e) => {
-  const f = e.target.files?.[0];
-  if (!f) return;
+  const f = e.target.files?.[0]; if (!f) return;
   try {
-    const data = JSON.parse(await f.text());
-    if (data.boxes) {
-      Object.keys(state.boxes).forEach((k) => {
-        if (data.boxes[k]) state.boxes[k] = { ...state.boxes[k], ...data.boxes[k] };
-      });
-    }
-    if (typeof data.db_csv === 'string') {
-      el.dbInput.value = data.db_csv;
-      state.db = parseDb(data.db_csv);
-      renderDb();
-      el.dbStatus.textContent = `Database termuat: ${state.db.size} peserta (dari backup).`;
-    }
-    if (typeof data.answer_key === 'string') el.answerKey.value = data.answer_key;
-    if (data.question_count) el.questionCount.value = data.question_count;
-    if (data.no_digit_count) el.noDigitCount.value = data.no_digit_count;
-    if (data.option_count) el.optionCount.value = data.option_count;
-    if (data.option_direction) el.optionDirection.value = data.option_direction;
-    if (Array.isArray(data.results)) {
-      state.results = data.results;
-      renderResults();
-      el.downloadBtn.disabled = state.results.length === 0;
-    }
-    syncBoxForm();
-    if (state.templateImage) drawTemplate();
-    log('Backup berhasil di-import. Lanjutkan pengerjaan Anda.');
-  } catch (err) {
-    log(`Import backup gagal: ${err.message}`);
-  }
+    const d = JSON.parse(await f.text());
+    if (d.boxes) Object.keys(state.boxes).forEach((k) => { if (d.boxes[k]) state.boxes[k] = { ...state.boxes[k], ...d.boxes[k] }; });
+    if (Array.isArray(d.answer_areas)) state.answerAreas = d.answer_areas;
+    if (d.zoom) { state.zoom = d.zoom; el.zoomRange.value = Math.round(state.zoom * 100); }
+    if (typeof d.db_csv === 'string') { el.dbInput.value = d.db_csv; state.db = parseDb(d.db_csv); renderDb(); }
+    if (d.answer_key) el.answerKey.value = d.answer_key;
+    if (d.no_digit_count) el.noDigitCount.value = d.no_digit_count;
+    if (d.no_direction) el.noDirection.value = d.no_direction;
+    if (d.question_count) el.questionCount.value = d.question_count;
+    if (d.option_count) el.optionCount.value = d.option_count;
+    if (Array.isArray(d.results)) { state.results = d.results; renderResults(); }
+    renderAreaConfig(); syncBoxForm(); drawTemplate();
+    log('Backup berhasil di-import');
+  } catch (err) { log(`Import backup gagal: ${err.message}`); }
 });
 
-(function waitCv() {
-  if (window.cv?.Mat) {
-    state.cvReady = true;
-    log('OpenCV siap.');
-  } else setTimeout(waitCv, 250);
+(function waitCV() {
+  if (window.cv?.Mat) { state.cvReady = true; log('OpenCV siap'); }
+  else setTimeout(waitCV, 250);
 })();
 
-initBoxControls();
-log('Aplikasi siap. Upload template untuk mulai konfigurasi sensor.');
+initBoxOptions();
+renderAreaConfig();
+log('Siap. OMR lingkaran: no peserta vertikal, jawaban horizontal multi-area didukung.');

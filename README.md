@@ -1,42 +1,20 @@
-# E-SMART.github.io - SAS/STS LJK Scanner
+# E-SMART.github.io - SAS/STS LJK Scanner (OMR Lingkaran)
 
-Web statis untuk GitHub Pages yang mendukung proses scanning LJK Evalbee untuk kegiatan **SAS/STS** sekolah.
+Web statis untuk GitHub Pages untuk scanning OMR LJK sekolah (SAS/STS).
 
-## Fitur terbaru
+## Fitur inti
 
-- Konfigurasi sensor langsung setelah upload template LJK (drag-and-drop pada canvas overlay).
-- Preview template tampil jelas (`img`) dan sensor diatur di layer `canvas`.
-- Sensor orientasi configurable dengan pola:
-  - **Atas: 3 kotak**
-  - **Bawah: 2 kotak**
-- Area **nomor peserta** dan **jawaban** bisa digeser manual.
-- Ukuran kotak sensor bisa diubah (drag handle pojok kanan bawah atau input manual X/Y/W/H).
-- Setting pembacaan **No Peserta** (jumlah digit) dan **opsi jawaban** (jumlah opsi + arah horizontal/vertical) bisa disesuaikan sesuai LJK.
-- Sumber scan:
-  - Upload batch gambar.
-  - Hardware paper feeder via **bridge lokal HTTP** (contoh endpoint default `http://localhost:17777/api/next-scan`).
-  - Kamera browser sebagai fallback.
-- Database peserta terlihat dalam tabel setelah dimuat.
-- Penilaian otomatis berbasis kunci jawaban, lalu ekspor hasil ke Excel.
-- Fitur **backup/restore JSON** agar pengerjaan bisa dilanjutkan kapan saja.
-
-## Format database peserta
-
-CSV (tanpa header wajib):
-
-`nomor_peserta,nama,kelas,ruang,mapel`
-
-Contoh:
-
-`12345,Budi Santoso,9A,Ruang 1,Matematika`
-
-## File pendukung SAS/STS
-
-Folder `sas-support/` berisi:
-
-- `template-database-sas.csv` (contoh data siswa)
-- `checklist-persiapan-sas-sts.md` (panduan persiapan kegiatan)
-- `backup-format-example.json` (contoh struktur backup)
+- Konfigurasi template interaktif (drag/resize box).
+- Zoom template (30%-150%) agar pengaturan sensor lebih mudah.
+- OMR berbentuk **lingkaran** untuk pembacaan no peserta dan jawaban.
+- No peserta mendukung arah opsi **vertikal** (ke bawah) atau horizontal.
+- Jawaban mendukung multi area (hingga 3 area), contoh:
+  - Area 1 soal 1-20
+  - Area 2 soal 21-40
+- Patokan grid otomatis ditampilkan sesuai jumlah soal dan jumlah opsi.
+- Sumber scan: upload batch, bridge feeder lokal HTTP, kamera fallback.
+- Backup/restore JSON untuk melanjutkan pengerjaan.
+- Export hasil ke Excel.
 
 ## Menjalankan lokal
 
@@ -44,16 +22,6 @@ Folder `sas-support/` berisi:
 python -m http.server 8080
 ```
 
-Buka: `http://localhost:8080`
+## Catatan
 
-## Deploy GitHub Pages
-
-1. Push ke GitHub.
-2. Settings → Pages.
-3. Source: Deploy from a branch.
-4. Pilih branch dan folder root (`/`).
-5. Simpan.
-
-## Catatan teknis
-
-Browser tidak dapat akses TWAIN/WIA scanner secara native tanpa aplikasi bridge lokal. Karena itu mode feeder hardware membutuhkan endpoint lokal yang mengirim image hasil scan.
+Browser tidak bisa akses scanner TWAIN/WIA langsung, jadi feeder hardware butuh aplikasi bridge lokal.

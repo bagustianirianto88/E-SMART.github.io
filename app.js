@@ -54,6 +54,17 @@ const tctx = el.templateCanvas.getContext('2d');
 const clamp = (v, mi = 0, ma = 1) => Math.max(mi, Math.min(ma, v));
 const log = (m) => { el.log.textContent += `[${new Date().toLocaleTimeString('id-ID')}] ${m}\n`; el.log.scrollTop = el.log.scrollHeight; };
 
+
+function normalizeAreasByQuestionCount() {
+  const total = Math.max(1, parseInt(el.questionCount.value, 10) || 40);
+  const active = state.answerAreas.filter(a => a.active);
+  if (!active.length) return;
+  const chunk = Math.ceil(total / active.length);
+  active.forEach((a, i) => {
+    a.start = i * chunk + 1;
+    a.end = Math.min(total, (i + 1) * chunk);
+  });
+}
 function initBoxOptions() {
   el.activeBoxSelect.innerHTML = '';
   Object.keys(state.boxes).forEach((k) => {
@@ -101,6 +112,7 @@ el.areaConfigTableBody.addEventListener('change', (e) => {
 el.applyAreaCountBtn.addEventListener('click', () => {
   const count = clamp(parseInt(el.answerAreaCount.value, 10) || 2, 1, 3);
   state.answerAreas.forEach((a, i) => { a.active = i < count; });
+  normalizeAreasByQuestionCount();
   renderAreaConfig();
   drawTemplate();
 });
@@ -108,19 +120,21 @@ el.applyAreaCountBtn.addEventListener('click', () => {
 function drawTemplate() {
   if (!state.templateImage) return;
   const img = state.templateImage;
-  const cssWidth = img.width * state.zoom;
-  const cssHeight = img.height * state.zoom;
+  const baseW = img.naturalWidth || img.width;
+  const baseH = img.naturalHeight || img.height;
+  const cssWidth = baseW * state.zoom;
+  const cssHeight = baseH * state.zoom;
 
   el.templatePreview.style.width = `${cssWidth}px`;
   el.templatePreview.style.height = `${cssHeight}px`;
-  el.templateCanvas.width = img.width;
-  el.templateCanvas.height = img.height;
+  el.templateCanvas.width = baseW;
+  el.templateCanvas.height = baseH;
   el.templateCanvas.style.width = `${cssWidth}px`;
   el.templateCanvas.style.height = `${cssHeight}px`;
 
-  tctx.clearRect(0, 0, img.width, img.height);
+  tctx.clearRect(0, 0, baseW, baseH);
   Object.entries(state.boxes).forEach(([k, b]) => {
-    const x = b.x * img.width, y = b.y * img.height, w = b.w * img.width, h = b.h * img.height;
+    const x = b.x * baseW, y = b.y * baseH, w = b.w * baseW, h = b.h * baseH;
     tctx.strokeStyle = b.color; tctx.lineWidth = k === el.activeBoxSelect.value ? 4 : 2;
     tctx.strokeRect(x, y, w, h);
     tctx.fillStyle = b.color; tctx.fillRect(x, Math.max(0, y - 18), 62, 18);
@@ -130,11 +144,11 @@ function drawTemplate() {
 
   // grid patokan interaktif untuk area soal
   const totalOpt = Math.max(2, parseInt(el.optionCount.value, 10) || 4);
-  state.answerAreas.filter(a => a.active).forEach((area) => {
+  state.answerAreas.filter(a => a.active).sort((a,b)=>a.start-b.start).forEach((area) => {
     const b = state.boxes[area.id];
     if (!b) return;
     const qCount = Math.max(1, area.end - area.start + 1);
-    const x = b.x * img.width, y = b.y * img.height, w = b.w * img.width, h = b.h * img.height;
+    const x = b.x * baseW, y = b.y * baseH, w = b.w * baseW, h = b.h * baseH;
     tctx.strokeStyle = 'rgba(255,255,255,.45)';
     tctx.lineWidth = 1;
     for (let qi = 1; qi < qCount; qi += 1) {
@@ -199,6 +213,12 @@ el.zoomRange.addEventListener('input', () => {
   state.zoom = (parseInt(el.zoomRange.value, 10) || 100) / 100;
   drawTemplate();
 });
+el.questionCount.addEventListener('change', () => {
+  normalizeAreasByQuestionCount();
+  renderAreaConfig();
+  drawTemplate();
+});
+el.optionCount.addEventListener('change', drawTemplate);
 
 function parseDb(raw) {
   const m = new Map();
@@ -251,7 +271,8 @@ function extractNo(gray) {
   const digits = Math.max(4, parseInt(el.noDigitCount.value, 10) || 10);
   const box = roi(gray, state.boxes.noPeserta);
   const bw = new cv.Mat();
-  cv.threshold(box, bw, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU);
+  cv.GaussianBlur(box, box, new cv.Size(3,3), 0);
+  cv.adaptiveThreshold(box, bw, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 31, 4);
   const result = [];
 
   if (el.noDirection.value === 'vertical') {
@@ -292,13 +313,14 @@ function detectAnswers(gray) {
   const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.slice(0, opt).split('');
   const answers = Array(totalQ).fill('');
 
-  state.answerAreas.filter(a => a.active).forEach((area) => {
+  state.answerAreas.filter(a => a.active).sort((a,b)=>a.start-b.start).forEach((area) => {
     const start = clamp(area.start, 1, totalQ);
     const end = clamp(area.end, start, totalQ);
     const qCount = end - start + 1;
     const b = roi(gray, state.boxes[area.id]);
     const bw = new cv.Mat();
-    cv.threshold(b, bw, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU);
+    cv.GaussianBlur(b, b, new cv.Size(3,3), 0);
+    cv.adaptiveThreshold(b, bw, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 31, 4);
 
     const qH = bw.rows / qCount;
     const oW = bw.cols / opt;
@@ -472,5 +494,6 @@ el.importBackupInput.addEventListener('change', async (e) => {
 })();
 
 initBoxOptions();
+normalizeAreasByQuestionCount();
 renderAreaConfig();
 log('Siap. OMR lingkaran: no peserta vertikal, jawaban horizontal multi-area didukung.');

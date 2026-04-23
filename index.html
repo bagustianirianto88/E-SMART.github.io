@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script async src="https://docs.opencv.org/4.10.0/opencv.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <header>
@@ -39,7 +40,7 @@
               <label>Y <input id="boxY" type="number" min="0" max="1" step="0.001" /></label>
               <label>W <input id="boxW" type="number" min="0.01" max="1" step="0.001" /></label>
               <label>H <input id="boxH" type="number" min="0.01" max="1" step="0.001" /></label>
-              <button id="applyBoxBtn" type="button">Apply</button>
+              <button id="applyBoxBtn" type="button">Apply (opsional)</button>
             </div>
           </div>
           <div>
@@ -84,13 +85,33 @@
         <div class="row"><button id="downloadBackupBtn">Download Backup</button><label>Import Backup <input type="file" id="importBackupInput" accept="application/json" /></label></div>
         <div class="row"><button id="processBtn">Proses Semua</button><button id="downloadBtn" disabled>Download Excel</button></div>
       </section>
+      <section class="panel">
+        <h2>5) Login Cloud (Supabase)</h2>
+        <div class="row">
+          <label>Supabase URL <input id="supabaseUrl" type="text" placeholder="https://xxxx.supabase.co" /></label>
+          <label>Anon Key <input id="supabaseKey" type="password" placeholder="eyJ..." /></label>
+        </div>
+        <div class="row">
+          <label>Email <input id="authEmail" type="email" placeholder="guru@sekolah.id" /></label>
+          <label>Password <input id="authPassword" type="password" /></label>
+        </div>
+        <div class="row">
+          <button id="authLoginBtn" type="button">Login</button>
+          <button id="authSignupBtn" type="button">Sign Up</button>
+          <button id="authLogoutBtn" type="button">Logout</button>
+          <button id="cloudSaveBtn" type="button">Simpan Progress Cloud</button>
+          <button id="cloudLoadBtn" type="button">Load Progress Cloud</button>
+          <span id="authStatus">Belum login</span>
+        </div>
+        <p class="hint">Buat tabel <code>scanner_progress</code> dengan kolom: <code>user_id uuid primary key</code>, <code>backup_json jsonb</code>, <code>updated_at timestamptz</code>.</p>
+      </section>
     </div>
 
     <div id="resultTab" class="tab-panel">
       <section class="panel">
         <h2>Hasil Scan</h2>
         <pre id="log"></pre>
-        <table id="resultTable"><thead><tr><th>File</th><th>No</th><th>Nama</th><th>Kelas</th><th>Jawaban</th><th>Benar</th><th>Nilai</th><th>Orientasi</th></tr></thead><tbody></tbody></table>
+        <table id="resultTable"><thead><tr><th>File</th><th>No</th><th>Nama</th><th>Kelas</th><th>Q1</th><th>...</th><th>Benar</th><th>Nilai</th><th>Orientasi</th></tr></thead><tbody></tbody></table>
       </section>
     </div>
 

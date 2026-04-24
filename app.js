@@ -50,7 +50,12 @@ const el = {
 };
 const tctx = el.templateCanvas.getContext('2d');
 const pctx = el.previewCanvas.getContext('2d');
-const APP_VERSION = 'PR v4';
+const APP_VERSION = (() => {
+  const q = new URLSearchParams(window.location.search).get('pr');
+  if (q) return `PR #${q}`;
+  if (window.GITHUB_PR_NUMBER) return `PR #${window.GITHUB_PR_NUMBER}`;
+  return 'PR #local';
+})();
 const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 const dash = (v) => (v === undefined || v === null || v === '' ? '-' : String(v));
 const log = (m) => { el.log.textContent += `[${new Date().toLocaleTimeString('id-ID')}] ${m}\n`; el.log.scrollTop = el.log.scrollHeight; };
@@ -80,6 +85,32 @@ function setActivePreview(index) {
   state.activePreviewIndex = index;
   state.previewData = state.previewItems[index];
   if (el.previewSelect) el.previewSelect.value = String(index);
+  drawPreviewScan();
+}
+
+function recomputeActivePreview() {
+  if (!state.cvReady || state.activePreviewIndex < 0) return;
+  const current = state.previewItems[state.activePreviewIndex];
+  if (!current?.canvas) return;
+  const boxes = resolveBoxes();
+  const src=cv.imread(current.canvas), gray=new cv.Mat(); cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY);
+  const ori=detectOrientationRobust(gray, boxes);
+  const no=decodeNo(ori.gray, boxes);
+  const ans=decodeAnswers(ori.gray, boxes);
+  const sc=scoreAnswers(ans.answers);
+  const siswa=state.db.get(no.text)||{nama:'-',kelas:'-'};
+  src.delete(); gray.delete(); ori.gray.delete();
+
+  current.answers = [...ans.answers];
+  current.choices = ans.choices.map(v=>[...v]);
+  current.margins = ans.margins;
+  state.previewData = current;
+
+  const i = current.resultIndex;
+  if (i !== undefined && state.results[i]) {
+    state.results[i] = { ...state.results[i], nomor: dash(no.text), nama: dash(siswa.nama), kelas: dash(siswa.kelas), answers: [...ans.answers], jawaban: ans.text, benar: sc.benar, nilai: sc.nilai, orientasi: ori.orientation };
+    renderResults();
+  }
   drawPreviewScan();
 }
 
@@ -209,6 +240,13 @@ function drawPreviewScan() {
   const { canvas, answers, choices } = state.previewData;
   el.previewCanvas.width = canvas.width; el.previewCanvas.height = canvas.height;
   pctx.drawImage(canvas, 0, 0);
+  ['top1','top2','top3','bot1','bot2','noPeserta','ans1','ans2','ans3'].forEach((k) => {
+    const b = boxes[k];
+    if (!b) return;
+    pctx.strokeStyle = b.color;
+    pctx.lineWidth = (k.startsWith('ans') || k === 'noPeserta') ? 1.8 : 2.4;
+    pctx.strokeRect(b.x * el.previewCanvas.width, b.y * el.previewCanvas.height, b.w * el.previewCanvas.width, b.h * el.previewCanvas.height);
+  });
 
   const w = el.previewCanvas.width, h = el.previewCanvas.height;
   const opt = Math.max(2, +el.optionCount.value || 4);
@@ -358,6 +396,7 @@ el.resultBody.addEventListener('click', (e) => {
   const pIdx = state.previewItems.findIndex((p) => p.resultIndex === idx);
   if (pIdx >= 0) {
     setActivePreview(pIdx);
+    recomputeActivePreview();
     activateTab('previewTab');
   }
 });
@@ -490,7 +529,9 @@ el.questionCount.addEventListener('input',()=>{ normalizeAreas(); renderAreaConf
 el.optionCount.addEventListener('input',drawTemplate);
 el.noDigitCount.addEventListener('input',drawTemplate);
 el.noDirection.addEventListener('change',drawTemplate);
-el.markThreshold.addEventListener('input',()=>{ drawTemplate(); drawPreviewScan(); });
+el.markThreshold.addEventListener('input',()=>{ drawTemplate(); recomputeActivePreview(); });
+el.orientThreshold.addEventListener('input',()=>{ drawTemplate(); recomputeActivePreview(); });
+el.sensorBlackThreshold.addEventListener('input',()=>{ drawTemplate(); recomputeActivePreview(); });
 
 el.areaConfigTableBody.addEventListener('input',(e)=>{ const i=+e.target.dataset.i, k=e.target.dataset.k; if(Number.isNaN(i)||!k) return; state.answerAreas[i][k]=k==='active'?e.target.checked:+e.target.value; drawTemplate(); drawPreviewScan(); });
 el.areaConfigTableBody.addEventListener('change',(e)=>{ const i=+e.target.dataset.i, k=e.target.dataset.k; if(Number.isNaN(i)||!k) return; state.answerAreas[i][k]=k==='active'?e.target.checked:+e.target.value; drawTemplate(); drawPreviewScan(); });
@@ -547,7 +588,7 @@ el.stopCameraBtn.addEventListener('click',()=>{ if(!state.stream) return; state.
 el.captureBtn.addEventListener('click',()=>{ const c=document.createElement('canvas'); c.width=el.video.videoWidth;c.height=el.video.videoHeight;c.getContext('2d').drawImage(el.video,0,0); state.queue.push({name:`cam-${Date.now()}.png`,canvas:c}); });
 
 el.loadDbBtn.addEventListener('click',()=>{ state.db=parseDb(el.dbInput.value); renderDb(); el.dbStatus.textContent=`Database: ${state.db.size}`; });
-el.processBtn.addEventListener('click', async ()=>{ if(!state.cvReady) return log('OpenCV belum siap'); if(!state.templateImage) return log('Upload template dulu'); if(!state.queue.length) return log('Antrean kosong'); const jobs=[...state.queue]; state.queue=[]; for(const j of jobs){ try{ const out = await processOne(j); state.results.push(out.result); state.previewItems.push(out.preview); }catch(err){ log(`Error ${j.name}: ${err.message}`);} } renderResults(); refreshPreviewOptions(); if (state.previewItems.length) setActivePreview(state.previewItems.length - 1); el.downloadBtn.disabled=!state.results.length; activateTab('previewTab'); });
+el.processBtn.addEventListener('click', async ()=>{ if(!state.cvReady) return log('OpenCV belum siap'); if(!state.templateImage) return log('Upload template dulu'); if(!state.queue.length) return log('Antrean kosong'); const jobs=[...state.queue]; state.queue=[]; for(const j of jobs){ try{ const out = await processOne(j); state.results.push(out.result); state.previewItems.push(out.preview); }catch(err){ log(`Error ${j.name}: ${err.message}`);} } renderResults(); refreshPreviewOptions(); if (state.previewItems.length) { setActivePreview(state.previewItems.length - 1); recomputeActivePreview(); } el.downloadBtn.disabled=!state.results.length; activateTab('previewTab'); });
 el.downloadBtn.addEventListener('click',()=>{ const rows = state.results.map(getResultRow); const ws=XLSX.utils.json_to_sheet(rows); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Hasil OMR'); XLSX.writeFile(wb,`hasil-omr-${new Date().toISOString().slice(0,10)}.xlsx`); });
 el.downloadBackupBtn.addEventListener('click',()=>{ const blob=new Blob([JSON.stringify(backup(),null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='backup-omr.json'; a.click(); URL.revokeObjectURL(a.href); });
 el.importBackupInput.addEventListener('change', async (e)=>{ const f=e.target.files?.[0]; if(!f) return; try{ const d=JSON.parse(await f.text()); applyBackupData(d); }catch(err){ log(`Import backup gagal: ${err.message}`);} });
@@ -564,8 +605,12 @@ el.anchorMode?.addEventListener('change', () => {
   drawPreviewScan();
   log(`Mode anchor sensor: ${state.useAnchorLayout ? 'aktif' : 'nonaktif'}.`);
 });
-el.previewSelect?.addEventListener('change', () => setActivePreview(Number(el.previewSelect.value)));
+el.previewSelect?.addEventListener('change', () => {
+  setActivePreview(Number(el.previewSelect.value));
+  recomputeActivePreview();
+});
 
 (function waitCV(){ if(window.cv?.Mat){ state.cvReady=true; log('OpenCV siap'); } else setTimeout(waitCV,250); })();
 log('Supabase: cukup isi Project URL + Access Token/Key, tanpa login email/password.');
+log('Versi: tambahkan ?pr=123 pada URL agar badge sesuai nomor PR GitHub.');
 log('Siap: deteksi sensor atas-bawah lebih dulu, preview semua hasil scan, dan threshold real-time di tab Preview.');

@@ -7,10 +7,12 @@
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script async src="https://docs.opencv.org/4.10.0/opencv.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <header>
     <h1>SAS/STS LJK Scanner (OMR Lingkaran)</h1>
+    <span id="appVersionBadge">PR #local</span>
     <p>Sensor lingkaran per soal/opsi + tab hasil scan + preview sensor.</p>
   </header>
 
@@ -35,11 +37,12 @@
             <h3>Kontrol Sensor</h3>
             <div class="row">
               <label>Kotak aktif <select id="activeBoxSelect"></select></label>
+              <label><input id="anchorMode" type="checkbox" checked /> Ikuti anchor sensor atas-bawah</label>
               <label>X <input id="boxX" type="number" min="0" max="1" step="0.001" /></label>
               <label>Y <input id="boxY" type="number" min="0" max="1" step="0.001" /></label>
               <label>W <input id="boxW" type="number" min="0.01" max="1" step="0.001" /></label>
               <label>H <input id="boxH" type="number" min="0.01" max="1" step="0.001" /></label>
-              <button id="applyBoxBtn" type="button">Apply</button>
+              <button id="applyBoxBtn" type="button">Apply (opsional)</button>
             </div>
           </div>
           <div>
@@ -49,9 +52,6 @@
               <label>Arah No Peserta <select id="noDirection"><option value="vertical">Vertikal</option><option value="horizontal">Horizontal</option></select></label>
               <label>Jumlah soal <input id="questionCount" type="number" min="1" max="200" value="40" /></label>
               <label>Jumlah opsi <input id="optionCount" type="number" min="2" max="10" value="4" /></label>
-              <label>Threshold arsiran (0-255) <input id="markThreshold" type="number" min="0" max="255" value="22" /></label>
-              <label>Threshold orientasi (0-255) <input id="orientThreshold" type="number" min="0" max="255" value="18" /></label>
-              <label>Threshold sensor hitam (%) <input id="sensorBlackThreshold" type="number" min="0" max="100" value="8" /></label>
             </div>
           </div>
         </div>
@@ -84,21 +84,46 @@
         <div class="row"><button id="downloadBackupBtn">Download Backup</button><label>Import Backup <input type="file" id="importBackupInput" accept="application/json" /></label></div>
         <div class="row"><button id="processBtn">Proses Semua</button><button id="downloadBtn" disabled>Download Excel</button></div>
       </section>
+      <section class="panel">
+        <h2>5) Supabase Access Token</h2>
+        <div class="row">
+          <label>Supabase URL <input id="supabaseUrl" type="text" placeholder="https://xxxx.supabase.co" /></label>
+          <label>Access Token / Key <input id="supabaseKey" type="password" placeholder="eyJ... / sbp_..." /></label>
+        </div>
+        <div class="row">
+          <label>Progress Key (opsional) <input id="progressKey" type="text" value="default" /></label>
+        </div>
+        <div class="row">
+          <button id="cloudSaveBtn" type="button">Simpan Progress Cloud</button>
+          <button id="cloudLoadBtn" type="button">Load Progress Cloud</button>
+          <button id="saveDbCloudBtn" type="button">Simpan DB Siswa</button>
+          <button id="loadDbCloudBtn" type="button">Load DB Siswa</button>
+          <span id="authStatus">Token belum dipakai</span>
+        </div>
+        <p class="hint">Cukup paste Project URL + token/key Supabase, lalu bisa langsung simpan/load tanpa login email/password.</p>
+        <p class="hint">Tabel yang dipakai: <code>scanner_progress(progress_key text primary key, backup_json jsonb, updated_at timestamptz)</code> dan <code>students(nomor text primary key, nama text, kelas text)</code>.</p>
+      </section>
     </div>
 
     <div id="resultTab" class="tab-panel">
       <section class="panel">
         <h2>Hasil Scan</h2>
         <pre id="log"></pre>
-        <table id="resultTable"><thead><tr><th>File</th><th>No</th><th>Nama</th><th>Kelas</th><th>Jawaban</th><th>Benar</th><th>Nilai</th><th>Orientasi</th></tr></thead><tbody></tbody></table>
+        <table id="resultTable"><thead><tr><th>File</th><th>No</th><th>Nama</th><th>Kelas</th><th>Q1</th><th>...</th><th>Benar</th><th>Nilai</th><th>Orientasi</th></tr></thead><tbody></tbody></table>
       </section>
     </div>
 
     <div id="previewTab" class="tab-panel">
       <section class="panel">
         <h2>Preview LJK + Sensor</h2>
+        <div class="row">
+          <label>Pilih hasil scan <select id="previewSelect"></select></label>
+          <label>Threshold arsiran (0-255) <input id="markThreshold" type="number" min="0" max="255" value="22" /></label>
+          <label>Threshold orientasi (0-255) <input id="orientThreshold" type="number" min="0" max="255" value="18" /></label>
+          <label>Threshold sensor hitam (%) <input id="sensorBlackThreshold" type="number" min="0" max="100" value="8" /></label>
+        </div>
         <canvas id="previewCanvas"></canvas>
-        <p class="hint">Menampilkan scan terakhir dengan overlay sensor lingkaran.</p>
+        <p class="hint">Menampilkan semua hasil scan yang sudah diproses, pilih data dari dropdown.</p>
       </section>
     </div>
   </main>

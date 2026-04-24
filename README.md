@@ -24,3 +24,19 @@ python -m http.server 8080
 ## Catatan
 
 Browser tidak bisa akses scanner TWAIN/WIA langsung, jadi feeder hardware butuh aplikasi bridge lokal.
+
+## Troubleshooting cepat
+
+### 1) "Invalid API key" Supabase
+- Gunakan **Project URL** + **Publishable/Anon key** dari Supabase Project Settings > API.
+- **Jangan** gunakan token dengan prefix `sbp_` (itu token Management API, bukan untuk query tabel dari web app).
+
+### 2) Badge versi PR menampilkan `PR #set-parameter`
+- Tambahkan query param saat membuka app, contoh:
+  - `...?pr=123`
+- Maka badge otomatis berubah menjadi `PR #123`.
+
+### 3) "Pull request gagal"
+- Pastikan branch sudah memiliki commit terbaru.
+- Coba push ulang branch, lalu buat PR lagi dengan title/body singkat.
+- Jika masih gagal, cek error dari platform Git provider (umumnya: konflik branch, permission, atau branch protection rule).

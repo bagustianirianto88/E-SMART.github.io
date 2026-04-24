@@ -10,9 +10,10 @@ const state = {
   resizeKey: null,
   previewData: null,
   supabase: null,
-  user: null,
   useAnchorLayout: true,
   relativeBoxes: {},
+  previewItems: [],
+  activePreviewIndex: -1,
   boxes: {
     noPeserta: { x: 0.07, y: 0.12, w: 0.24, h: 0.2, color: '#22c55e', label: 'NO' },
     top1: { x: 0.08, y: 0.03, w: 0.06, h: 0.035, color: '#38bdf8', label: 'TOP1' },
@@ -42,14 +43,14 @@ const el = {
   dbInput: $('dbInput'), loadDbBtn: $('loadDbBtn'), dbStatus: $('dbStatus'), dbTableBody: document.querySelector('#dbTable tbody'), answerKey: $('answerKey'),
   processBtn: $('processBtn'), downloadBtn: $('downloadBtn'), downloadBackupBtn: $('downloadBackupBtn'), importBackupInput: $('importBackupInput'),
   resultHead: document.querySelector('#resultTable thead'), resultBody: document.querySelector('#resultTable tbody'), log: $('log'),
-  supabaseUrl: $('supabaseUrl'), supabaseKey: $('supabaseKey'), authEmail: $('authEmail'), authPassword: $('authPassword'),
-  authLoginBtn: $('authLoginBtn'), authSignupBtn: $('authSignupBtn'), authLogoutBtn: $('authLogoutBtn'), cloudSaveBtn: $('cloudSaveBtn'),
+  supabaseUrl: $('supabaseUrl'), supabaseKey: $('supabaseKey'), progressKey: $('progressKey'), cloudSaveBtn: $('cloudSaveBtn'),
   cloudLoadBtn: $('cloudLoadBtn'), authStatus: $('authStatus'),
   saveDbCloudBtn: $('saveDbCloudBtn'), loadDbCloudBtn: $('loadDbCloudBtn'),
-  anchorMode: $('anchorMode')
+  anchorMode: $('anchorMode'), previewSelect: $('previewSelect'), appVersionBadge: $('appVersionBadge')
 };
 const tctx = el.templateCanvas.getContext('2d');
 const pctx = el.previewCanvas.getContext('2d');
+const APP_VERSION = 'PR v4';
 const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 const dash = (v) => (v === undefined || v === null || v === '' ? '-' : String(v));
 const log = (m) => { el.log.textContent += `[${new Date().toLocaleTimeString('id-ID')}] ${m}\n`; el.log.scrollTop = el.log.scrollHeight; };
@@ -58,6 +59,28 @@ function activateTab(id) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === id));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === id));
   if (id === 'previewTab') drawPreviewScan();
+}
+
+function refreshPreviewOptions() {
+  if (!el.previewSelect) return;
+  el.previewSelect.innerHTML = '';
+  state.previewItems.forEach((p, i) => {
+    const opt = document.createElement('option');
+    opt.value = String(i);
+    opt.textContent = `${i + 1}. ${dash(p.file)}`;
+    el.previewSelect.appendChild(opt);
+  });
+  if (state.activePreviewIndex >= 0 && el.previewSelect.options[state.activePreviewIndex]) {
+    el.previewSelect.value = String(state.activePreviewIndex);
+  }
+}
+
+function setActivePreview(index) {
+  if (index < 0 || index >= state.previewItems.length) return;
+  state.activePreviewIndex = index;
+  state.previewData = state.previewItems[index];
+  if (el.previewSelect) el.previewSelect.value = String(index);
+  drawPreviewScan();
 }
 
 function normalizeAreas() {
@@ -328,6 +351,17 @@ function renderResults(){
   });
 }
 
+el.resultBody.addEventListener('click', (e) => {
+  const tr = e.target.closest('tr');
+  if (!tr?.dataset.index) return;
+  const idx = Number(tr.dataset.index);
+  const pIdx = state.previewItems.findIndex((p) => p.resultIndex === idx);
+  if (pIdx >= 0) {
+    setActivePreview(pIdx);
+    activateTab('previewTab');
+  }
+});
+
 async function processOne(item){
   const boxes = resolveBoxes();
   const src=cv.imread(item.canvas), gray=new cv.Mat(); cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY);
@@ -338,9 +372,8 @@ async function processOne(item){
   const siswa=state.db.get(no.text)||{nama:'-',kelas:'-'};
   src.delete(); gray.delete(); ori.gray.delete();
   const result = {file:item.name, nomor:dash(no.text), nama:dash(siswa.nama), kelas:dash(siswa.kelas), jawaban:ans.text, answers:ans.answers, benar:sc.benar, nilai:sc.nilai, orientasi:ori.orientation};
-  state.previewData = { canvas: item.canvas, answers: [...ans.answers], choices: ans.choices.map(v=>[...v]), margins: ans.margins, resultIndex: state.results.length };
-  drawPreviewScan();
-  return result;
+  const preview = { file: item.name, canvas: item.canvas, answers: [...ans.answers], choices: ans.choices.map(v=>[...v]), margins: ans.margins, resultIndex: state.results.length };
+  return { result, preview };
 }
 
 function backup(){ return {version:8, boxes:state.boxes, answer_areas:state.answerAreas, zoom:state.zoom, mark_threshold:el.markThreshold.value, orient_threshold:el.orientThreshold.value, sensor_black_threshold:el.sensorBlackThreshold.value, no_digit_count:el.noDigitCount.value, no_direction:el.noDirection.value, question_count:el.questionCount.value, option_count:el.optionCount.value, db_csv:el.dbInput.value, answer_key:el.answerKey.value, results:state.results, use_anchor_layout: state.useAnchorLayout, relative_boxes: state.relativeBoxes}; }
@@ -365,69 +398,35 @@ function initSupabaseClient(){
   const url = el.supabaseUrl.value.trim();
   const key = el.supabaseKey.value.trim();
   if (!url || !key) {
-    log('Supabase URL/Anon Key wajib diisi.');
+    log('Supabase URL dan Access Token/Key wajib diisi.');
     return null;
   }
   state.supabase = window.supabase.createClient(url, key);
+  el.authStatus.textContent = 'Token aktif';
   return state.supabase;
-}
-
-async function authLogin(){
-  const client = state.supabase || initSupabaseClient();
-  if (!client) return;
-  const email = el.authEmail.value.trim();
-  const password = el.authPassword.value;
-  const { data, error } = await client.auth.signInWithPassword({ email, password });
-  if (error) return log(`Login gagal: ${error.message}`);
-  state.user = data.user;
-  el.authStatus.textContent = `Login: ${dash(state.user?.email)}`;
-  log(`Login sukses: ${dash(state.user?.email)}`);
-}
-
-async function authSignup(){
-  const client = state.supabase || initSupabaseClient();
-  if (!client) return;
-  const email = el.authEmail.value.trim();
-  const password = el.authPassword.value;
-  const { data, error } = await client.auth.signUp({ email, password });
-  if (error) return log(`Signup gagal: ${error.message}`);
-  state.user = data.user;
-  el.authStatus.textContent = `Akun dibuat: ${dash(state.user?.email)}`;
-  log('Signup berhasil. Cek email verifikasi jika diperlukan.');
-}
-
-async function authLogout(){
-  if (!state.supabase) return;
-  const { error } = await state.supabase.auth.signOut();
-  if (error) return log(`Logout gagal: ${error.message}`);
-  state.user = null;
-  el.authStatus.textContent = 'Belum login';
-  log('Logout sukses.');
 }
 
 async function saveCloudProgress(){
   if (!state.supabase) initSupabaseClient();
   if (!state.supabase) return;
-  const { data: sessionData } = await state.supabase.auth.getUser();
-  const user = sessionData?.user;
-  if (!user) return log('Simpan cloud gagal: belum login.');
-  const payload = { user_id: user.id, backup_json: backup(), updated_at: new Date().toISOString() };
-  const { error } = await state.supabase.from('scanner_progress').upsert(payload, { onConflict: 'user_id' });
+  const key = (el.progressKey?.value || 'default').trim() || 'default';
+  const payload = { progress_key: key, backup_json: backup(), updated_at: new Date().toISOString() };
+  const { error } = await state.supabase.from('scanner_progress').upsert(payload, { onConflict: 'progress_key' });
   if (error) return log(`Simpan cloud gagal: ${error.message}`);
-  log('Progress tersimpan ke Supabase (scanner_progress).');
+  el.authStatus.textContent = `Token aktif (key: ${key})`;
+  log(`Progress tersimpan ke Supabase dengan key: ${key}.`);
 }
 
 async function loadCloudProgress(){
   if (!state.supabase) initSupabaseClient();
   if (!state.supabase) return;
-  const { data: sessionData } = await state.supabase.auth.getUser();
-  const user = sessionData?.user;
-  if (!user) return log('Load cloud gagal: belum login.');
-  const { data, error } = await state.supabase.from('scanner_progress').select('backup_json').eq('user_id', user.id).maybeSingle();
+  const key = (el.progressKey?.value || 'default').trim() || 'default';
+  const { data, error } = await state.supabase.from('scanner_progress').select('backup_json').eq('progress_key', key).maybeSingle();
   if (error) return log(`Load cloud gagal: ${error.message}`);
   if (!data?.backup_json) return log('Data progress cloud kosong.');
   applyBackupData(data.backup_json);
-  log('Progress cloud berhasil dimuat.');
+  el.authStatus.textContent = `Token aktif (key: ${key})`;
+  log(`Progress cloud key "${key}" berhasil dimuat.`);
 }
 
 async function saveDbToSupabase(){
@@ -479,6 +478,7 @@ captureRelativeLayout();
 document.querySelectorAll('.tab-btn').forEach(b=>b.addEventListener('click',()=>activateTab(b.dataset.tab)));
 activateTab('configTab');
 if (el.anchorMode) el.anchorMode.checked = state.useAnchorLayout;
+if (el.appVersionBadge) el.appVersionBadge.textContent = APP_VERSION;
 
 el.templateInput.addEventListener('change',(e)=>{ const f=e.target.files?.[0]; if(!f) return; const img=new Image(); img.onload=()=>{state.templateImage=img; el.templatePreview.src=img.src; drawTemplate();}; img.src=URL.createObjectURL(f);});
 el.zoomRange.addEventListener('input',()=>{ state.zoom=(+el.zoomRange.value||100)/100; drawTemplate(); });
@@ -547,14 +547,11 @@ el.stopCameraBtn.addEventListener('click',()=>{ if(!state.stream) return; state.
 el.captureBtn.addEventListener('click',()=>{ const c=document.createElement('canvas'); c.width=el.video.videoWidth;c.height=el.video.videoHeight;c.getContext('2d').drawImage(el.video,0,0); state.queue.push({name:`cam-${Date.now()}.png`,canvas:c}); });
 
 el.loadDbBtn.addEventListener('click',()=>{ state.db=parseDb(el.dbInput.value); renderDb(); el.dbStatus.textContent=`Database: ${state.db.size}`; });
-el.processBtn.addEventListener('click', async ()=>{ if(!state.cvReady) return log('OpenCV belum siap'); if(!state.templateImage) return log('Upload template dulu'); if(!state.queue.length) return log('Antrean kosong'); const jobs=[...state.queue]; state.queue=[]; for(const j of jobs){ try{ state.results.push(await processOne(j)); }catch(err){ log(`Error ${j.name}: ${err.message}`);} } renderResults(); el.downloadBtn.disabled=!state.results.length; activateTab('previewTab'); });
+el.processBtn.addEventListener('click', async ()=>{ if(!state.cvReady) return log('OpenCV belum siap'); if(!state.templateImage) return log('Upload template dulu'); if(!state.queue.length) return log('Antrean kosong'); const jobs=[...state.queue]; state.queue=[]; for(const j of jobs){ try{ const out = await processOne(j); state.results.push(out.result); state.previewItems.push(out.preview); }catch(err){ log(`Error ${j.name}: ${err.message}`);} } renderResults(); refreshPreviewOptions(); if (state.previewItems.length) setActivePreview(state.previewItems.length - 1); el.downloadBtn.disabled=!state.results.length; activateTab('previewTab'); });
 el.downloadBtn.addEventListener('click',()=>{ const rows = state.results.map(getResultRow); const ws=XLSX.utils.json_to_sheet(rows); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Hasil OMR'); XLSX.writeFile(wb,`hasil-omr-${new Date().toISOString().slice(0,10)}.xlsx`); });
 el.downloadBackupBtn.addEventListener('click',()=>{ const blob=new Blob([JSON.stringify(backup(),null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='backup-omr.json'; a.click(); URL.revokeObjectURL(a.href); });
 el.importBackupInput.addEventListener('change', async (e)=>{ const f=e.target.files?.[0]; if(!f) return; try{ const d=JSON.parse(await f.text()); applyBackupData(d); }catch(err){ log(`Import backup gagal: ${err.message}`);} });
 
-el.authLoginBtn?.addEventListener('click', authLogin);
-el.authSignupBtn?.addEventListener('click', authSignup);
-el.authLogoutBtn?.addEventListener('click', authLogout);
 el.cloudSaveBtn?.addEventListener('click', saveCloudProgress);
 el.cloudLoadBtn?.addEventListener('click', loadCloudProgress);
 el.saveDbCloudBtn?.addEventListener('click', saveDbToSupabase);
@@ -567,7 +564,8 @@ el.anchorMode?.addEventListener('change', () => {
   drawPreviewScan();
   log(`Mode anchor sensor: ${state.useAnchorLayout ? 'aktif' : 'nonaktif'}.`);
 });
+el.previewSelect?.addEventListener('change', () => setActivePreview(Number(el.previewSelect.value)));
 
 (function waitCV(){ if(window.cv?.Mat){ state.cvReady=true; log('OpenCV siap'); } else setTimeout(waitCV,250); })();
-log('Supabase: pakai Project URL + Publishable key (anon). Direct connection string tidak dipakai di browser.');
-log('Siap: deteksi sensor atas-bawah lebih dulu, layout anchor aktif, preview edit multi-jawaban, dan sinkron cloud.');
+log('Supabase: cukup isi Project URL + Access Token/Key, tanpa login email/password.');
+log('Siap: deteksi sensor atas-bawah lebih dulu, preview semua hasil scan, dan threshold real-time di tab Preview.');

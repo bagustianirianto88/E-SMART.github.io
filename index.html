@@ -12,6 +12,7 @@
 <body>
   <header>
     <h1>SAS/STS LJK Scanner (OMR Lingkaran)</h1>
+    <span id="appVersionBadge">PR v3</span>
     <p>Sensor lingkaran per soal/opsi + tab hasil scan + preview sensor.</p>
   </header>
 
@@ -51,9 +52,6 @@
               <label>Arah No Peserta <select id="noDirection"><option value="vertical">Vertikal</option><option value="horizontal">Horizontal</option></select></label>
               <label>Jumlah soal <input id="questionCount" type="number" min="1" max="200" value="40" /></label>
               <label>Jumlah opsi <input id="optionCount" type="number" min="2" max="10" value="4" /></label>
-              <label>Threshold arsiran (0-255) <input id="markThreshold" type="number" min="0" max="255" value="22" /></label>
-              <label>Threshold orientasi (0-255) <input id="orientThreshold" type="number" min="0" max="255" value="18" /></label>
-              <label>Threshold sensor hitam (%) <input id="sensorBlackThreshold" type="number" min="0" max="100" value="8" /></label>
             </div>
           </div>
         </div>
@@ -87,27 +85,23 @@
         <div class="row"><button id="processBtn">Proses Semua</button><button id="downloadBtn" disabled>Download Excel</button></div>
       </section>
       <section class="panel">
-        <h2>5) Login Cloud (Supabase)</h2>
+        <h2>5) Supabase Access Token</h2>
         <div class="row">
           <label>Supabase URL <input id="supabaseUrl" type="text" placeholder="https://xxxx.supabase.co" /></label>
-          <label>Anon Key <input id="supabaseKey" type="password" placeholder="eyJ..." /></label>
+          <label>Access Token / Key <input id="supabaseKey" type="password" placeholder="eyJ... / sbp_..." /></label>
         </div>
         <div class="row">
-          <label>Email <input id="authEmail" type="email" placeholder="guru@sekolah.id" /></label>
-          <label>Password <input id="authPassword" type="password" /></label>
+          <label>Progress Key (opsional) <input id="progressKey" type="text" value="default" /></label>
         </div>
         <div class="row">
-          <button id="authLoginBtn" type="button">Login</button>
-          <button id="authSignupBtn" type="button">Sign Up</button>
-          <button id="authLogoutBtn" type="button">Logout</button>
           <button id="cloudSaveBtn" type="button">Simpan Progress Cloud</button>
           <button id="cloudLoadBtn" type="button">Load Progress Cloud</button>
           <button id="saveDbCloudBtn" type="button">Simpan DB Siswa</button>
           <button id="loadDbCloudBtn" type="button">Load DB Siswa</button>
-          <span id="authStatus">Belum login</span>
+          <span id="authStatus">Token belum dipakai</span>
         </div>
-        <p class="hint">Gunakan <b>Project URL</b> sebagai Supabase URL, dan <b>Publishable key</b> sebagai Anon Key. Direct connection string tidak dipakai di browser.</p>
-        <p class="hint">Tabel yang dipakai: <code>scanner_progress(user_id uuid primary key, backup_json jsonb, updated_at timestamptz)</code> dan <code>students(nomor text primary key, nama text, kelas text)</code>.</p>
+        <p class="hint">Cukup paste Project URL + token/key Supabase, lalu bisa langsung simpan/load tanpa login email/password.</p>
+        <p class="hint">Tabel yang dipakai: <code>scanner_progress(progress_key text primary key, backup_json jsonb, updated_at timestamptz)</code> dan <code>students(nomor text primary key, nama text, kelas text)</code>.</p>
       </section>
     </div>
 
@@ -122,8 +116,14 @@
     <div id="previewTab" class="tab-panel">
       <section class="panel">
         <h2>Preview LJK + Sensor</h2>
+        <div class="row">
+          <label>Pilih hasil scan <select id="previewSelect"></select></label>
+          <label>Threshold arsiran (0-255) <input id="markThreshold" type="number" min="0" max="255" value="22" /></label>
+          <label>Threshold orientasi (0-255) <input id="orientThreshold" type="number" min="0" max="255" value="18" /></label>
+          <label>Threshold sensor hitam (%) <input id="sensorBlackThreshold" type="number" min="0" max="100" value="8" /></label>
+        </div>
         <canvas id="previewCanvas"></canvas>
-        <p class="hint">Menampilkan scan terakhir dengan overlay sensor lingkaran.</p>
+        <p class="hint">Menampilkan semua hasil scan yang sudah diproses, pilih data dari dropdown.</p>
       </section>
     </div>
   </main>

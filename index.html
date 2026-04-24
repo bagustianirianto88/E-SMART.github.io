@@ -88,7 +88,7 @@
         <h2>5) Supabase Access Token</h2>
         <div class="row">
           <label>Supabase URL <input id="supabaseUrl" type="text" placeholder="https://xxxx.supabase.co" /></label>
-          <label>Access Token / Key <input id="supabaseKey" type="password" placeholder="eyJ... / sbp_..." /></label>
+          <label>Publishable / Anon Key <input id="supabaseKey" type="password" placeholder="eyJ... / sb_publishable_..." /></label>
         </div>
         <div class="row">
           <label>Progress Key (opsional) <input id="progressKey" type="text" value="default" /></label>
@@ -100,7 +100,7 @@
           <button id="loadDbCloudBtn" type="button">Load DB Siswa</button>
           <span id="authStatus">Token belum dipakai</span>
         </div>
-        <p class="hint">Cukup paste Project URL + token/key Supabase, lalu bisa langsung simpan/load tanpa login email/password.</p>
+        <p class="hint">Gunakan <b>Project URL</b> + <b>Publishable/Anon key</b>. Jangan pakai token <code>sbp_</code> karena itu hanya untuk Management API.</p>
         <p class="hint">Tabel yang dipakai: <code>scanner_progress(progress_key text primary key, backup_json jsonb, updated_at timestamptz)</code> dan <code>students(nomor text primary key, nama text, kelas text)</code>.</p>
       </section>
     </div>

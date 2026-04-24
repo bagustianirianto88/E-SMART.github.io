@@ -95,12 +95,20 @@ function recomputeActivePreview() {
   const boxes = resolveBoxes();
   const src=cv.imread(current.canvas), gray=new cv.Mat(); cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY);
   const ori=detectOrientationRobust(gray, boxes);
+<<<<<<< codex/fix-github-data-retrieval-issues-jl476d
   const corrected = rectifyByAnchors(ori.gray, boxes);
   const no=decodeNo(corrected, boxes);
   const ans=decodeAnswers(corrected, boxes);
   const sc=scoreAnswers(ans.answers);
   const siswa=state.db.get(no.text)||{nama:'-',kelas:'-'};
   src.delete(); gray.delete(); ori.gray.delete(); corrected.delete();
+=======
+  const no=decodeNo(ori.gray, boxes);
+  const ans=decodeAnswers(ori.gray, boxes);
+  const sc=scoreAnswers(ans.answers);
+  const siswa=state.db.get(no.text)||{nama:'-',kelas:'-'};
+  src.delete(); gray.delete(); ori.gray.delete();
+>>>>>>> main
 
   current.answers = [...ans.answers];
   current.choices = ans.choices.map(v=>[...v]);
@@ -295,6 +303,7 @@ function roi(gray, box){ const x=Math.floor(gray.cols*box.x),y=Math.floor(gray.r
 function meanCircleInk(mat,x,y,r){ let sum=0,n=0; for(let yy=Math.max(0,Math.floor(y-r));yy<=Math.min(mat.rows-1,Math.ceil(y+r));yy++) for(let xx=Math.max(0,Math.floor(x-r));xx<=Math.min(mat.cols-1,Math.ceil(x+r));xx++){ const dx=xx-x,dy=yy-y; if(dx*dx+dy*dy<=r*r){sum+=mat.ucharPtr(yy,xx)[0];n++;}} return 255-(n?sum/n:255); }
 
 function sensorStats(gray, boxes, key){ const r=roi(gray,boxes[key]); const mean=255-cv.mean(r)[0]; const bw=new cv.Mat(); cv.threshold(r,bw,0,255,cv.THRESH_BINARY_INV+cv.THRESH_OTSU); const fill=(cv.countNonZero(bw)/(bw.rows*bw.cols))*100; r.delete(); bw.delete(); return {mean,fill}; }
+<<<<<<< codex/fix-github-data-retrieval-issues-jl476d
 function detectAnchorCenter(gray, box){
   const r = roi(gray, box);
   const bw = new cv.Mat();
@@ -329,6 +338,8 @@ function rectifyByAnchors(gray, boxes) {
   return warped;
 }
 
+=======
+>>>>>>> main
 function detectOrientationRobust(gray, boxes){
   const orientTh = Math.max(0, +el.orientThreshold.value || 18);
   const fillTh = Math.max(0, +el.sensorBlackThreshold.value || 8);
@@ -337,6 +348,7 @@ function detectOrientationRobust(gray, boxes){
   for(let tries=0; tries<4; tries++){
     const top = ['top1','top2','top3'].map(k=>sensorStats(current,boxes,k));
     const bot = ['bot1','bot2'].map(k=>sensorStats(current,boxes,k));
+<<<<<<< codex/fix-github-data-retrieval-issues-jl476d
     const topScore = top.reduce((a,s)=>a+(s.mean-orientTh)+(s.fill-fillTh),0);
     const botScore = bot.reduce((a,s)=>a+(s.mean-orientTh)+(s.fill-fillTh),0);
     const score = topScore - botScore;
@@ -344,6 +356,12 @@ function detectOrientationRobust(gray, boxes){
       if (best.mat) best.mat.delete();
       best = { score, mat: current.clone(), tag: `rot${tries*90}` };
     }
+=======
+    const topOk = top.every(s=>s.mean>=orientTh && s.fill>=fillTh);
+    const botOk = bot.every(s=>s.mean>=orientTh && s.fill>=fillTh);
+    if(topOk && !botOk) return {gray: current.clone(), orientation: `normal@${tries}`};
+    if(botOk && !topOk){ const r=new cv.Mat(); cv.rotate(current,r,cv.ROTATE_180); current.delete(); current=r; continue; }
+>>>>>>> main
     const r=new cv.Mat(); cv.rotate(current,r,cv.ROTATE_90_CLOCKWISE); current.delete(); current=r;
   }
   current.delete();
@@ -445,6 +463,7 @@ async function processOne(item){
   const boxes = resolveBoxes();
   const src=cv.imread(item.canvas), gray=new cv.Mat(); cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY);
   const ori=detectOrientationRobust(gray, boxes);
+<<<<<<< codex/fix-github-data-retrieval-issues-jl476d
   const corrected = rectifyByAnchors(ori.gray, boxes);
   const no=decodeNo(corrected, boxes);
   const ans=decodeAnswers(corrected, boxes);
@@ -537,6 +556,95 @@ async function loadDbFromSupabase(){
   log(`Database siswa dimuat dari Supabase: ${state.db.size} baris.`);
 }
 
+=======
+  const no=decodeNo(ori.gray, boxes);
+  const ans=decodeAnswers(ori.gray, boxes);
+  const sc=scoreAnswers(ans.answers);
+  const siswa=state.db.get(no.text)||{nama:'-',kelas:'-'};
+  src.delete(); gray.delete(); ori.gray.delete();
+  const result = {file:item.name, nomor:dash(no.text), nama:dash(siswa.nama), kelas:dash(siswa.kelas), jawaban:ans.text, answers:ans.answers, benar:sc.benar, nilai:sc.nilai, orientasi:ori.orientation};
+  const preview = { file: item.name, canvas: item.canvas, answers: [...ans.answers], choices: ans.choices.map(v=>[...v]), margins: ans.margins, resultIndex: state.results.length };
+  return { result, preview };
+}
+
+function backup(){ return {version:8, boxes:state.boxes, answer_areas:state.answerAreas, zoom:state.zoom, mark_threshold:el.markThreshold.value, orient_threshold:el.orientThreshold.value, sensor_black_threshold:el.sensorBlackThreshold.value, no_digit_count:el.noDigitCount.value, no_direction:el.noDirection.value, question_count:el.questionCount.value, option_count:el.optionCount.value, db_csv:el.dbInput.value, answer_key:el.answerKey.value, results:state.results, use_anchor_layout: state.useAnchorLayout, relative_boxes: state.relativeBoxes}; }
+
+function updatePreviewResultSync(){
+  if (!state.previewData) return;
+  const i = state.previewData.resultIndex;
+  if (i === undefined || !state.results[i]) return;
+  state.results[i].answers = [...state.previewData.answers];
+  state.results[i].jawaban = state.previewData.answers.join('');
+  const sc = scoreAnswers(state.previewData.answers);
+  state.results[i].benar = sc.benar;
+  state.results[i].nilai = sc.nilai;
+  renderResults();
+}
+
+function initSupabaseClient(){
+  if (!window.supabase?.createClient) {
+    log('Supabase SDK belum termuat.');
+    return null;
+  }
+  const url = el.supabaseUrl.value.trim();
+  const key = el.supabaseKey.value.trim();
+  if (!url || !key) {
+    log('Supabase URL dan Access Token/Key wajib diisi.');
+    return null;
+  }
+  state.supabase = window.supabase.createClient(url, key);
+  el.authStatus.textContent = 'Token aktif';
+  return state.supabase;
+}
+
+async function saveCloudProgress(){
+  if (!state.supabase) initSupabaseClient();
+  if (!state.supabase) return;
+  const key = (el.progressKey?.value || 'default').trim() || 'default';
+  const payload = { progress_key: key, backup_json: backup(), updated_at: new Date().toISOString() };
+  const { error } = await state.supabase.from('scanner_progress').upsert(payload, { onConflict: 'progress_key' });
+  if (error) return log(`Simpan cloud gagal: ${error.message}`);
+  el.authStatus.textContent = `Token aktif (key: ${key})`;
+  log(`Progress tersimpan ke Supabase dengan key: ${key}.`);
+}
+
+async function loadCloudProgress(){
+  if (!state.supabase) initSupabaseClient();
+  if (!state.supabase) return;
+  const key = (el.progressKey?.value || 'default').trim() || 'default';
+  const { data, error } = await state.supabase.from('scanner_progress').select('backup_json').eq('progress_key', key).maybeSingle();
+  if (error) return log(`Load cloud gagal: ${error.message}`);
+  if (!data?.backup_json) return log('Data progress cloud kosong.');
+  applyBackupData(data.backup_json);
+  el.authStatus.textContent = `Token aktif (key: ${key})`;
+  log(`Progress cloud key "${key}" berhasil dimuat.`);
+}
+
+async function saveDbToSupabase(){
+  if (!state.supabase) initSupabaseClient();
+  if (!state.supabase) return;
+  const rows = [...state.db.values()].map((s) => ({ nomor: String(s.nomor), nama: dash(s.nama), kelas: dash(s.kelas) }));
+  if (!rows.length) return log('Database lokal kosong. Isi dulu lalu klik Muat Database.');
+  const { error } = await state.supabase.from('students').upsert(rows, { onConflict: 'nomor' });
+  if (error) return log(`Simpan students gagal: ${error.message}`);
+  log(`Database siswa tersimpan ke Supabase: ${rows.length} baris.`);
+}
+
+async function loadDbFromSupabase(){
+  if (!state.supabase) initSupabaseClient();
+  if (!state.supabase) return;
+  const { data, error } = await state.supabase.from('students').select('nomor,nama,kelas').order('nomor', { ascending: true });
+  if (error) return log(`Load students gagal: ${error.message}`);
+  if (!data?.length) return log('Tabel students kosong.');
+  const lines = data.map((r) => `${dash(r.nomor)},${dash(r.nama)},${dash(r.kelas)}`);
+  el.dbInput.value = lines.join('\n');
+  state.db = parseDb(el.dbInput.value);
+  renderDb();
+  el.dbStatus.textContent = `Database: ${state.db.size}`;
+  log(`Database siswa dimuat dari Supabase: ${state.db.size} baris.`);
+}
+
+>>>>>>> main
 function applyBackupData(d){
   if(d.boxes) Object.keys(state.boxes).forEach(k=>{ if(d.boxes[k]) state.boxes[k]={...state.boxes[k],...d.boxes[k]};});
   if(Array.isArray(d.answer_areas)) state.answerAreas=d.answer_areas;
